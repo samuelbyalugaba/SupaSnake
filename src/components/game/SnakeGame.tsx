@@ -279,8 +279,6 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isAuthDialogOpen) return;
-
       if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
         if (gameState.status === 'RUNNING') pauseGame();
@@ -302,8 +300,13 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
       }
     };
     
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    if (!isAuthDialogOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    
+    return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [gameState.status, pauseGame, startGame, handleDirectionChange, isAuthDialogOpen]);
 
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
@@ -410,5 +413,3 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
 };
 
 export default SnakeGame;
-
-    
