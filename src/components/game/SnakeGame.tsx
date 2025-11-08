@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore } from '@/firebase';
 import { useSounds } from '@/hooks/use-sounds';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -307,17 +307,20 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
   }, [gameState.status, pauseGame, startGame, handleDirectionChange, isAuthDialogOpen]);
 
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
     const touch = e.touches[0];
     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
   };
   
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
     if (!touchStartRef.current) return;
     const touch = e.touches[0];
     const dx = touch.clientX - touchStartRef.current.x;
     const dy = touch.clientY - touchStartRef.current.y;
+    const swipeThreshold = 20;
 
-    if (Math.abs(dx) > 30 || Math.abs(dy) > 30) {
+    if (Math.abs(dx) > swipeThreshold || Math.abs(dy) > swipeThreshold) {
       if (Math.abs(dx) > Math.abs(dy)) {
         handleDirectionChange(dx > 0 ? 'RIGHT' : 'LEFT');
       } else {
@@ -334,7 +337,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
   };
 
   return (
-    <Card className="w-full max-w-[640px] mx-auto bg-card/50 border-primary/20 p-2">
+    <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-lg md:max-w-xl lg:max-w-2xl bg-card/50 border-primary/20 p-2">
       <CardContent className="p-0">
         <div className="flex justify-between items-center p-2 text-lg">
           <div>Score: <span className="text-primary font-bold">{gameState.score}</span></div>
@@ -349,7 +352,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
             ref={canvasRef}
             width={CANVAS_SIZE_DESKTOP}
             height={CANVAS_SIZE_DESKTOP}
-            className="w-full h-full object-contain rounded-md"
+            className="w-full h-full object-contain rounded-md touch-none"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={() => touchStartRef.current = null}

@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import * as Tone from 'tone';
 
 export function useSounds() {
@@ -18,7 +19,7 @@ export function useSounds() {
             oscillator: { type: 'sine' },
             envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.5 },
           }).toDestination();
-          eatSynth.triggerAttackRelease('G5', '16n', Tone.now());
+          eatSynth.triggerAttackRelease('G5', '16n');
           // Clean up the synth after it's done playing
           setTimeout(() => eatSynth.dispose(), 500);
         } else if (type === 'gameOver') {
@@ -33,7 +34,7 @@ export function useSounds() {
               release: 0.1,
             },
           }).toDestination();
-          gameOverSynth.triggerAttackRelease("8n", Tone.now());
+          gameOverSynth.triggerAttackRelease("8n");
           setTimeout(() => gameOverSynth.dispose(), 200);
         }
       } catch (error) {

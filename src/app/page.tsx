@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -12,8 +13,8 @@ export default function Home() {
   const [gameState, setGameState] = React.useState<GameState | null>(null);
 
   return (
-    <div className="relative min-h-screen w-full bg-background text-foreground flex flex-col items-center justify-center p-4 font-headline">
-      <header className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center">
+    <div className="relative min-h-screen w-full bg-background text-foreground flex flex-col items-center justify-center p-4 font-headline overflow-hidden">
+      <header className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10">
         <div className="text-2xl font-bold flex items-center gap-2">
           <Gamepad2 className="text-primary" size={28} />
           <h1>Neon Snake</h1>
@@ -21,18 +22,20 @@ export default function Home() {
         <AuthButton />
       </header>
       
-      <div className="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 items-start mt-24 lg:mt-16">
-        <div className="lg:col-span-2 w-full">
-          <SnakeGame onStateChange={setGameState} />
-        </div>
+      <main className="w-full max-w-7xl mx-auto flex-1 flex items-center justify-center">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-8 items-center mt-16 lg:mt-0">
+          <div className="lg:col-span-2 w-full flex justify-center">
+            <SnakeGame onStateChange={setGameState} />
+          </div>
 
-        <div className="w-full flex flex-col gap-8">
-          <Leaderboard />
-          {gameState && <AIPlayerCoach gameState={gameState} />}
+          <div className="w-full flex flex-col gap-8">
+            <Leaderboard />
+            {gameState && <AIPlayerCoach gameState={gameState} />}
+          </div>
         </div>
-      </div>
+      </main>
       
-      <footer className="w-full text-center text-muted-foreground text-sm p-4 mt-8">
+      <footer className="w-full text-center text-muted-foreground text-sm p-4">
         Built with Love @ TSJ Diversified Group
       </footer>
     </div>
