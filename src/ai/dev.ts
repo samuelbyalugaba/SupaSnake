@@ -1,4 +1,4 @@
 import { config } from 'dotenv';
 config();
 
-import '@/ai/flows/sound-effect-adviser.ts';
+import '@/ai/flows/player-coach-flow.ts';

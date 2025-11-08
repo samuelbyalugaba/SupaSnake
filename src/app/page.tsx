@@ -3,7 +3,7 @@
 import React from 'react';
 import SnakeGame from '@/components/game/SnakeGame';
 import Leaderboard from '@/components/game/Leaderboard';
-import SoundEffectAdvisor from '@/components/ai/SoundEffectAdvisor';
+import AIPlayerCoach from '@/components/ai/AIPlayerCoach';
 import type { GameState } from '@/lib/types';
 import { Gamepad2 } from 'lucide-react';
 
@@ -24,7 +24,7 @@ export default function Home() {
 
         <div className="w-full flex flex-col gap-8">
           <Leaderboard />
-          {gameState && <SoundEffectAdvisor gameState={gameState} />}
+          {gameState && <AIPlayerCoach gameState={gameState} />}
         </div>
       </div>
       
