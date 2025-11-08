@@ -3,16 +3,16 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { useSounds } from '@/hooks/use-sounds';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import AuthDialog from '@/components/auth/AuthDialog';
 import { doc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Volume2, VolumeX, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { GRID_SIZE, CANVAS_SIZE_DESKTOP, INITIAL_SNAKE_POSITION, INITIAL_DIRECTION, GAME_SPEED_START, GAME_SPEED_INCREMENT, MAX_LEVEL, FOOD_PER_LEVEL, SCORE_INCREMENT } from '@/lib/constants';
 import type { Direction, Point, GameState } from '@/lib/types';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { useSounds } from '@/hooks/use-sounds';
 
 interface SnakeGameProps {
   onStateChange: (state: GameState) => void;
@@ -23,7 +23,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
   const { user } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
-  const { playSound, isMuted, toggleMute } = useSounds();
+  const { playSound } = useSounds();
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
   const [highScore, setHighScore] = useState(0);
 
@@ -292,6 +292,14 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+       if (
+        document.activeElement &&
+        (document.activeElement.tagName.toLowerCase() === 'input' ||
+          document.activeElement.tagName.toLowerCase() === 'textarea')
+      ) {
+        return; // Do nothing if an input field is focused
+      }
+
       if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
         if (gameState.status === 'RUNNING') pauseGame();
@@ -313,14 +321,11 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
       }
     };
     
-    if (!isAuthDialogOpen) {
-      window.addEventListener('keydown', handleKeyDown);
-    }
-    
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
         window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [gameState.status, pauseGame, startGame, handleDirectionChange, isAuthDialogOpen]);
+  }, [gameState.status, pauseGame, startGame, handleDirectionChange]);
 
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
@@ -359,9 +364,6 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
           <div>Score: <span className="text-primary font-bold">{gameState.score}</span></div>
           <div>Level: <span className="text-primary font-bold">{gameState.level}</span></div>
           <div>High Score: <span className="text-primary font-bold">{highScore}</span></div>
-          <Button onClick={toggleMute} variant="ghost" size="icon">
-            {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-          </Button>
         </div>
         <div className="relative aspect-square w-full">
           <canvas
@@ -426,3 +428,5 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
 };
 
 export default SnakeGame;
+
+    

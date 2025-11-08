@@ -5,7 +5,7 @@ import { useState, useCallback } from 'react';
 import * as Tone from 'tone';
 
 export function useSounds() {
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false); // Sound is on by default now
 
   const playSound = useCallback(async (type: 'eat' | 'gameOver') => {
     if (!isMuted) {
@@ -43,9 +43,12 @@ export function useSounds() {
     }
   }, [isMuted]);
 
+  // This function is no longer needed but kept in case you want to add a mute button back later.
   const toggleMute = useCallback(() => {
     setIsMuted(prev => !prev);
   }, []);
 
   return { isMuted, toggleMute, playSound };
 }
+
+    
