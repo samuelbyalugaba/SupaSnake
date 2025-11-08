@@ -1,44 +1,10 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import * as Tone from 'tone';
 
 export function useSounds() {
   const [isMuted, setIsMuted] = useState(true);
-  
-  const synths = useRef<{
-    eatSynth: Tone.Synth | null;
-    gameOverSynth: Tone.NoiseSynth | null;
-  }>({ eatSynth: null, gameOverSynth: null });
-
-  useEffect(() => {
-    // Initialize synths on the client after mount
-    synths.current.eatSynth = new Tone.Synth({
-      oscillator: { type: 'sine' },
-      envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.5 },
-    }).toDestination();
-    
-    synths.current.gameOverSynth = new Tone.NoiseSynth({
-      noise: {
-        type: 'brown'
-      },
-      envelope: {
-        attack: 0.005,
-        decay: 0.1,
-        sustain: 0,
-        release: 0.1,
-      },
-    }).toDestination();
-
-    return () => {
-      if (synths.current.eatSynth) {
-        synths.current.eatSynth.dispose();
-      }
-      if (synths.current.gameOverSynth) {
-        synths.current.gameOverSynth.dispose();
-      }
-    }
-  }, []);
 
   const playSound = useCallback(async (type: 'eat' | 'gameOver') => {
     if (!isMuted) {
@@ -47,12 +13,28 @@ export function useSounds() {
           await Tone.start();
         }
     
-        if (type === 'eat' && synths.current.eatSynth) {
-          // Stop any previous sound to avoid timing errors
-          synths.current.eatSynth.triggerRelease();
-          synths.current.eatSynth.triggerAttackRelease('G5', '16n');
-        } else if (type === 'gameOver' && synths.current.gameOverSynth) {
-          synths.current.gameOverSynth.triggerAttackRelease("8n");
+        if (type === 'eat') {
+          const eatSynth = new Tone.Synth({
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.5 },
+          }).toDestination();
+          eatSynth.triggerAttackRelease('G5', '16n', Tone.now());
+          // Clean up the synth after it's done playing
+          setTimeout(() => eatSynth.dispose(), 500);
+        } else if (type === 'gameOver') {
+           const gameOverSynth = new Tone.NoiseSynth({
+            noise: {
+              type: 'brown'
+            },
+            envelope: {
+              attack: 0.005,
+              decay: 0.1,
+              sustain: 0,
+              release: 0.1,
+            },
+          }).toDestination();
+          gameOverSynth.triggerAttackRelease("8n", Tone.now());
+          setTimeout(() => gameOverSynth.dispose(), 200);
         }
       } catch (error) {
         console.error("Could not play sound:", error);
