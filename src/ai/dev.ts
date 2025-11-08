@@ -1,4 +1,4 @@
 import { config } from 'dotenv';
 config();
 
-import '@/ai/flows/player-coach-flow.ts';
+import '@/ai/flows/snake-chatbot-flow.ts';

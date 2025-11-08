@@ -4,7 +4,7 @@
 import React from 'react';
 import SnakeGame from '@/components/game/SnakeGame';
 import Leaderboard from '@/components/game/Leaderboard';
-import AIPlayerCoach from '@/components/ai/AIPlayerCoach';
+import AIChatbot from '@/components/ai/AIChatbot';
 import type { GameState } from '@/lib/types';
 import { Gamepad2 } from 'lucide-react';
 import AuthButton from '@/components/auth/AuthButton';
@@ -23,14 +23,14 @@ export default function Home() {
       </header>
       
       <main className="w-full max-w-7xl mx-auto flex-1 flex items-center justify-center">
-        <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-8 items-center mt-16 lg:mt-0">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-8 items-start mt-16 lg:mt-0">
           <div className="lg:col-span-2 w-full flex justify-center">
             <SnakeGame onStateChange={setGameState} />
           </div>
 
           <div className="w-full flex flex-col gap-8">
             <Leaderboard />
-            {gameState && <AIPlayerCoach gameState={gameState} />}
+            <AIChatbot />
           </div>
         </div>
       </main>
