@@ -48,6 +48,8 @@ export function useSounds() {
         }
     
         if (type === 'eat' && synths.current.eatSynth) {
+          // Stop any previous sound to avoid timing errors
+          synths.current.eatSynth.triggerRelease();
           synths.current.eatSynth.triggerAttackRelease('G5', '16n');
         } else if (type === 'gameOver' && synths.current.gameOverSynth) {
           synths.current.gameOverSynth.triggerAttackRelease("8n");
