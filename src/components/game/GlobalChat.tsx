@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useUser, useFirestore, useCollection } from '@/firebase';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { addDoc, collection, serverTimestamp, query, orderBy, limit } from 'firebase/firestore';
 import { Send, MessageSquare } from 'lucide-react';
 import type { Message } from '@/lib/types';
@@ -22,8 +22,8 @@ const GlobalChat: React.FC = () => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  const messagesRef = useMemo(() => collection(db, 'messages'), [db]);
-  const messagesQuery = useMemo(() => query(messagesRef, orderBy('timestamp', 'desc'), limit(50)), [messagesRef]);
+  const messagesRef = useMemoFirebase(() => collection(db, 'messages'), [db]);
+  const messagesQuery = useMemoFirebase(() => query(messagesRef, orderBy('timestamp', 'desc'), limit(50)), [messagesRef]);
 
   const { data: messages, isLoading } = useCollection<Message>(messagesQuery);
   
