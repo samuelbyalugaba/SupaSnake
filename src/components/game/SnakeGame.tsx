@@ -327,6 +327,12 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
     }
   };
 
+  const handleOverlayClick = () => {
+    if (gameState.status === 'IDLE' || gameState.status === 'GAME_OVER') {
+      startGame();
+    }
+  };
+
   return (
     <Card className="w-full max-w-[640px] mx-auto bg-card/50 border-primary/20 p-2">
       <CardContent className="p-0">
@@ -349,11 +355,14 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
             onTouchEnd={() => touchStartRef.current = null}
           />
           {(gameState.status !== 'RUNNING') && (
-            <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-center rounded-md p-4">
+            <div 
+              className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-center rounded-md p-4 cursor-pointer"
+              onClick={handleOverlayClick}
+            >
                 {gameState.status === 'IDLE' && (
                     <>
                         <h2 className="text-4xl font-bold text-primary">Neon Snake</h2>
-                        <p className="mt-4 text-xl animate-flash">Press Enter to Start</p>
+                        <p className="mt-4 text-xl animate-flash">Tap or Press Enter to Start</p>
                         <div className="mt-8 text-muted-foreground grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="text-left">
                                 <p className='font-bold text-primary'>Controls:</p>
@@ -380,7 +389,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
                         <div className="flex gap-4 mt-6">
                             <Button onClick={startGame}>Restart</Button>
                             {!user && gameState.score > 0 && (
-                                <Button variant="secondary" onClick={() => setIsAuthDialogOpen(true)}>
+                                <Button variant="secondary" onClick={(e) => { e.stopPropagation(); setIsAuthDialogOpen(true); }}>
                                     <Sparkles className="mr-2 h-4 w-4" />
                                     Save Score
                                 </Button>
