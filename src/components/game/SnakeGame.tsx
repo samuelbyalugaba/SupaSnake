@@ -364,7 +364,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
             >
                 {gameState.status === 'IDLE' && (
                     <>
-                        <h2 className="text-4xl font-bold text-primary">Neon Snake</h2>
+                        <h2 className="text-4xl font-bold text-primary">Supa Snake</h2>
                         <p className="mt-4 text-xl animate-flash">Tap or Press Enter to Start</p>
                         <div className="mt-8 text-muted-foreground grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="text-left">

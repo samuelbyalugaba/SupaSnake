@@ -17,7 +17,7 @@ export default function Home() {
       <header className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10">
         <div className="text-2xl font-bold flex items-center gap-2">
           <Gamepad2 className="text-primary" size={28} />
-          <h1>Neon Snake</h1>
+          <h1>Supa Snake</h1>
         </div>
         <AuthButton />
       </header>

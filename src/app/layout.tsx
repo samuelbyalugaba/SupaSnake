@@ -5,7 +5,7 @@ import { Providers } from '@/components/providers';
 import { FirebaseClientProvider } from '@/firebase';
 
 export const metadata: Metadata = {
-  title: 'Neon Snake',
+  title: 'Supa Snake',
   description: 'A modern, responsive Snake game with a retro neon theme.',
 };
 
