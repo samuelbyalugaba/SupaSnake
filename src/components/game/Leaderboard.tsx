@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useFirestore } from '@/firebase';
 import type { HighScore } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -12,8 +12,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 const Leaderboard = () => {
   const [scores, setScores] = useState<HighScore[]>([]);
   const [loading, setLoading] = useState(true);
+  const db = useFirestore();
 
   useEffect(() => {
+    if (!db) return;
     const scoresQuery = query(collection(db, 'highscores'), orderBy('score', 'desc'), limit(10));
     const unsubscribe = onSnapshot(scoresQuery, (querySnapshot) => {
       const scoresData: HighScore[] = [];
@@ -28,7 +30,7 @@ const Leaderboard = () => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [db]);
 
   const getRankIcon = (rank: number) => {
     if (rank === 0) return <Trophy className="w-5 h-5 text-yellow-400" />;

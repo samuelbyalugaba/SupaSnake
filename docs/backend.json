@@ -37,7 +37,11 @@
         },
         "userId": {
           "type": "string",
-          "description": "Reference to User. (Relationship: User 1:N HighScore)"
+          "description": "Reference to the user who achieved the score."
+        },
+        "username": {
+          "type": "string",
+          "description": "The username of the player who achieved the score."
         },
         "score": {
           "type": "number",
@@ -50,8 +54,8 @@
         }
       },
       "required": [
-        "id",
         "userId",
+        "username",
         "score",
         "timestamp"
       ]
@@ -60,7 +64,8 @@
   "auth": {
     "providers": [
       "password",
-      "anonymous"
+      "anonymous",
+      "google.com"
     ]
   },
   "firestore": {
@@ -72,36 +77,19 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores user profile information.  Owned by the user.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier for the user, matching the Firebase Auth UID."
-            }
-          ]
+          "description": "Stores user profile information. Owned by the user."
         }
       },
       {
-        "path": "/users/{userId}/highscores/{highScoreId}",
+        "path": "/highscores/{highScoreId}",
         "definition": {
           "entityName": "HighScore",
           "schema": {
             "$ref": "#/backend/entities/HighScore"
           },
-          "description": "Stores high scores achieved by a user. Includes userId for ownership validation.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier for the user who achieved the high score."
-            },
-            {
-              "name": "highScoreId",
-              "description": "The unique identifier for the high score entry."
-            }
-          ]
+          "description": "Stores high scores for the global leaderboard. Writable by any authenticated user, readable by all."
         }
       }
-    ],
-    "reasoning": "The Firestore structure is designed to ensure data integrity, security, and scalability for the Neon Snake game. It adheres to the principles of Authorization Independence, Structural Segregation, and Access Modeling.\n\n**Authorization Independence:** High scores are stored with the userId.  Security rules can directly validate the `request.auth.uid` against the `userId` field, ensuring only the user can modify their own high scores.\n\n**Structural Segregation:** User data and high scores are stored in separate collections.  User profiles are kept in `/users/{userId}` and high scores in `/users/{userId}/highscores/{highScoreId}`. This segregation allows for different security rules for user profiles (more restrictive) versus high scores (user-owned, but potentially more read-heavy).\n\n**Access Modeling:** Path-based ownership is used for user high scores. This means high scores are nested under the user document and are therefore owned by the user.  This structure allows simple and efficient security rules based on path validation.\n\n**QAPs (Rules are not Filters):** The chosen structure supports secure list operations. Listing high scores is done within the context of a specific user (`/users/{userId}/highscores`). This prevents needing to filter based on user ID in the rules, improving security and performance. The leaderboard, which displays the top N scores regardless of user, will require a separate, carefully designed query with appropriate indexing and security rules.  Because it aggregates scores from different users, it should reside in a location where it is only writable by backend services, or through a carefully controlled cloud function that validates the data before writing to the leaderboard collection."
+    ]
   }
 }

@@ -1,13 +1,12 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useUser, useFirestore } from '@/firebase';
 import { useSounds } from '@/hooks/use-sounds';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import AuthDialog from '@/components/auth/AuthDialog';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Volume2, VolumeX, Sparkles } from 'lucide-react';
 import { GRID_SIZE, CANVAS_SIZE_DESKTOP, INITIAL_SNAKE_POSITION, INITIAL_DIRECTION, GAME_SPEED_START, GAME_SPEED_INCREMENT, MAX_LEVEL, FOOD_PER_LEVEL, SCORE_INCREMENT } from '@/lib/constants';
@@ -19,7 +18,8 @@ interface SnakeGameProps {
 
 const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { user } = useAuth();
+  const { user } = useUser();
+  const db = useFirestore();
   const { toast } = useToast();
   const { isMuted, toggleMute, playSound } = useSounds();
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
@@ -108,7 +108,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
         }
       }
     }
-  }, [gameState.score, highScore, playSound, user, toast]);
+  }, [gameState.score, highScore, playSound, user, toast, db]);
 
 
   const updateGame = useCallback(() => {
