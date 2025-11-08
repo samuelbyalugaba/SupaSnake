@@ -145,41 +145,45 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
   const updateGame = useCallback(() => {
     if (gameState.status !== 'RUNNING') return;
 
-    let isGameOver = false;
+    let newSnake = [...gameState.snake];
+    const head = { ...newSnake[0] };
+
+    switch (gameState.direction) {
+      case 'UP': head.y -= 1; break;
+      case 'DOWN': head.y += 1; break;
+      case 'LEFT': head.x -= 1; break;
+      case 'RIGHT': head.x += 1; break;
+    }
+
+    // Check for wall collision
+    if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
+      gameOver();
+      return;
+    }
+
+    // Check for self collision
+    for (let i = 1; i < newSnake.length; i++) {
+      if (head.x === newSnake[i].x && head.y === newSnake[i].y) {
+        gameOver();
+        return;
+      }
+    }
 
     setGameState(prev => {
-      // If the game is not running, don't update
+      // Re-check status in case gameOver was called just now
       if (prev.status !== 'RUNNING') return prev;
 
-      const newSnake = [...prev.snake];
-      const head = { ...newSnake[0] };
+      newSnake = [...prev.snake];
+      const currentHead = { ...newSnake[0] };
 
       switch (prev.direction) {
-        case 'UP': head.y -= 1; break;
-        case 'DOWN': head.y += 1; break;
-        case 'LEFT': head.x -= 1; break;
-        case 'RIGHT': head.x += 1; break;
-      }
-
-      // Check for wall collision
-      if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
-        isGameOver = true;
-      }
-
-      // Check for self collision
-      for (let i = 1; i < newSnake.length; i++) {
-        if (head.x === newSnake[i].x && head.y === newSnake[i].y) {
-          isGameOver = true;
-        }
+        case 'UP': currentHead.y -= 1; break;
+        case 'DOWN': currentHead.y += 1; break;
+        case 'LEFT': currentHead.x -= 1; break;
+        case 'RIGHT': currentHead.x += 1; break;
       }
       
-      if (isGameOver) {
-        gameOver();
-        // Return previous state because gameOver will trigger the state update to GAME_OVER
-        return prev;
-      }
-      
-      newSnake.unshift(head);
+      newSnake.unshift(currentHead);
 
       let newScore = prev.score;
       let newLevel = prev.level;
@@ -187,7 +191,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
       let newFoodEatenThisLevel = prev.foodEatenThisLevel;
       let newFood = prev.food;
 
-      if (head.x === prev.food.x && head.y === prev.food.y) {
+      if (currentHead.x === prev.food.x && currentHead.y === prev.food.y) {
         playSound('eat');
         newScore += SCORE_INCREMENT;
         newFoodEatenThisLevel++;
@@ -213,7 +217,8 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
         foodEatenThisLevel: newFoodEatenThisLevel,
       };
     });
-  }, [gameState.status, gameOver, playSound, generateFood]);
+  }, [gameState, gameOver, playSound, generateFood]);
+
 
   const draw = useCallback((ctx: CanvasRenderingContext2D) => {
     const cellSize = CANVAS_SIZE_DESKTOP / GRID_SIZE;
