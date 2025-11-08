@@ -19,7 +19,7 @@ const SoundEffectAdviceInputSchema = z.object({
 export type SoundEffectAdviceInput = z.infer<typeof SoundEffectAdviceInputSchema>;
 
 const SoundEffectAdviceOutputSchema = z.object({
-  suggestedSoundEffect: z.string().describe('The name of the suggested sound effect (e.g., chime, buzz, levelUp) or null if no sound effect is recommended.'),
+  suggestedSoundEffect: z.string().nullable().describe('The name of the suggested sound effect (e.g., chime, buzz, levelUp) or null if no sound effect is recommended.'),
   reason: z.string().describe('A brief explanation of why the suggested sound effect is appropriate for the current game state.'),
 });
 export type SoundEffectAdviceOutput = z.infer<typeof SoundEffectAdviceOutputSchema>;
