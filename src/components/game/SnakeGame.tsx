@@ -2,12 +2,12 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useUser, useFirestore } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useSounds } from '@/hooks/use-sounds';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import AuthDialog from '@/components/auth/AuthDialog';
-import { doc, serverTimestamp } from 'firebase/firestore';
+import { doc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Volume2, VolumeX, Sparkles } from 'lucide-react';
 import { GRID_SIZE, CANVAS_SIZE_DESKTOP, INITIAL_SNAKE_POSITION, INITIAL_DIRECTION, GAME_SPEED_START, GAME_SPEED_INCREMENT, MAX_LEVEL, FOOD_PER_LEVEL, SCORE_INCREMENT } from '@/lib/constants';
@@ -42,9 +42,23 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
   const gameLoopRef = useRef<number>();
   const touchStartRef = useRef<Point | null>(null);
 
+  // Fetch user's personal high score from Firestore or local storage
   useEffect(() => {
-    setHighScore(Number(localStorage.getItem('highScore') || '0'));
-  }, []);
+    const fetchHighScore = async () => {
+      if (user && db) {
+        const scoreRef = doc(db, 'highscores', user.uid);
+        const scoreSnap = await getDoc(scoreRef);
+        if (scoreSnap.exists()) {
+          setHighScore(scoreSnap.data().score);
+        } else {
+          setHighScore(0);
+        }
+      } else {
+        setHighScore(Number(localStorage.getItem('highScore') || '0'));
+      }
+    };
+    fetchHighScore();
+  }, [user, db, gameState.status]);
   
   useEffect(() => {
     onStateChange(gameState);
@@ -105,8 +119,6 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
     setGameState(prev => ({ ...prev, status: 'GAME_OVER' }));
     playSound('gameOver');
     if (gameState.score > highScore) {
-      setHighScore(gameState.score);
-      localStorage.setItem('highScore', String(gameState.score));
       if (user && db && gameState.score > 0) {
         const scoreRef = doc(db, 'highscores', user.uid);
         const scoreData = {
@@ -116,6 +128,11 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
           timestamp: serverTimestamp(),
         };
         setDocumentNonBlocking(scoreRef, scoreData, { merge: true });
+        setHighScore(gameState.score); // update high score in UI
+      } else {
+         // For non-logged in users, use local storage
+         localStorage.setItem('highScore', String(gameState.score));
+         setHighScore(gameState.score); // update high score in UI
       }
     }
   }, [gameState.score, highScore, playSound, user, db]);
