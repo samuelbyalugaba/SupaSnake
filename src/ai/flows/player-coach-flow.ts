@@ -62,15 +62,7 @@ const playerCoachFlow = ai.defineFlow(
     outputSchema: PlayerCoachAdviceOutputSchema,
   },
   async input => {
-    try {
-      const {output} = await playerCoachPrompt(input);
-      return output!;
-    } catch (error) {
-      console.error('Error processing player coach advice:', error);
-      return {
-        title: 'Coach is Stumped',
-        message: 'I seem to be at a loss for words, but keep up the great work!',
-      };
-    }
+    const {output} = await playerCoachPrompt(input);
+    return output!;
   }
 );
