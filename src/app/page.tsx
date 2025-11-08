@@ -33,7 +33,7 @@ export default function Home() {
       </div>
       
       <footer className="w-full text-center text-muted-foreground text-sm p-4 mt-8">
-        Built with Next.js, Firebase, and Genkit.
+        Built with Love @ TSJ Diversified Group
       </footer>
     </div>
   );
