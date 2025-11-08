@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/firebase';
-import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 
 interface AuthDialogProps {
   open: boolean;
@@ -22,20 +22,6 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ open, onOpenChange }) => {
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-      toast({ title: 'Success', description: 'Logged in successfully.' });
-      onOpenChange(false);
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not sign in with Google.' });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,23 +69,10 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ open, onOpenChange }) => {
         <DialogHeader>
           <DialogTitle>{isLogin ? 'Log In' : 'Sign Up'} to Save Score</DialogTitle>
           <DialogDescription>
-            {isLogin ? "Log in to save your high scores and compete on the leaderboard." : "Create an account to save your high scores."}
+            {isLogin ? "Log in with your email to save high scores." : "Create an account to save your high scores."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <Button onClick={handleGoogleSignIn} variant="outline" disabled={loading}>
-            Sign In with Google
-          </Button>
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with
-              </span>
-            </div>
-          </div>
           <form onSubmit={handleEmailAuth} className="grid gap-4">
             {!isLogin && (
               <div className="grid gap-2">
