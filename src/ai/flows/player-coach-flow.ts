@@ -13,7 +13,11 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const PlayerCoachAdviceInputSchema = z.object({
-  gameState: z.string().describe('A JSON string representing the current game state, including score, level, snake length, food eaten, and game status.'),
+  score: z.number().describe("The player's current score."),
+  level: z.number().describe("The current game level."),
+  snakeLength: z.number().describe("The current length of the snake."),
+  status: z.string().describe("The current status of the game (e.g., 'RUNNING', 'GAME_OVER')."),
+  foodEatenThisLevel: z.number().describe("The amount of food eaten in the current level."),
 });
 export type PlayerCoachAdviceInput = z.infer<typeof PlayerCoachAdviceInputSchema>;
 
@@ -34,7 +38,11 @@ const playerCoachPrompt = ai.definePrompt({
   prompt: `You are an AI Player Coach for the Neon Snake game. Your goal is to provide encouraging and helpful tips to the player based on their current game state. Keep your messages short, fun, and positive.
 
 Analyze the provided game state:
-{{{gameState}}}
+- Score: {{score}}
+- Level: {{level}}
+- Snake Length: {{snakeLength}}
+- Food Eaten This Level: {{foodEatenThisLevel}}
+- Status: {{status}}
 
 Here are some scenarios and the type of message you should generate:
 - If status is 'GAME_OVER': Provide a positive wrap-up. Mention their score and encourage them to try again.

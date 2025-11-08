@@ -23,13 +23,11 @@ const AIPlayerCoach: React.FC<AIPlayerCoachProps> = ({ gameState }) => {
       setAdvice(null);
       try {
         const adviceInput = {
-          gameState: JSON.stringify({
-            score: gameState.score,
-            level: gameState.level,
-            snakeLength: gameState.snake.length,
-            status: gameState.status,
-            foodEatenThisLevel: gameState.foodEatenThisLevel,
-          }),
+          score: gameState.score,
+          level: gameState.level,
+          snakeLength: gameState.snake.length,
+          status: gameState.status,
+          foodEatenThisLevel: gameState.foodEatenThisLevel,
         };
         const result = await getPlayerCoachAdvice(adviceInput);
         setAdvice({ title: result.title, message: result.message });
