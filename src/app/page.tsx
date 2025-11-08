@@ -25,13 +25,13 @@ export default function Home() {
         <AuthButton />
       </header>
       
-      <main className="w-full max-w-7xl mx-auto flex-1 flex items-center justify-center">
-        <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-8 items-start mt-16 lg:mt-0">
-          <div className="lg:col-span-2 w-full flex justify-center">
+      <main className="w-full max-w-screen-xl mx-auto flex-1 flex items-center justify-center px-4">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-5 gap-8 xl:gap-12 items-start mt-20 lg:mt-0">
+          <div className="lg:col-span-3 w-full flex justify-center">
             <SnakeGame onStateChange={setGameState} />
           </div>
 
-          <div className="w-full flex flex-col gap-8">
+          <div className="lg:col-span-2 w-full flex flex-col gap-8">
             <Leaderboard />
             { user && <GlobalChat /> }
             <AIChatbot />
