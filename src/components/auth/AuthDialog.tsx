@@ -63,9 +63,22 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ open, onOpenChange }) => {
       setLoading(false);
     }
   };
+  
+  const handleOpenChange = (isOpen: boolean) => {
+    // Reset form state when dialog is closed
+    if (!isOpen) {
+      setEmail('');
+      setPassword('');
+      setUsername('');
+      setIsLogin(true);
+      setLoading(false);
+    }
+    onOpenChange(isOpen);
+  };
+
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{isLogin ? 'Log In' : 'Sign Up'} to Save Score</DialogTitle>

@@ -94,7 +94,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
     if (gameState.score > highScore) {
       setHighScore(gameState.score);
       localStorage.setItem('highScore', String(gameState.score));
-      if (user && gameState.score > 0) {
+      if (user && db && gameState.score > 0) {
         try {
           await addDoc(collection(db, 'highscores'), {
             userId: user.uid,
@@ -250,6 +250,8 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if(isAuthDialogOpen) return;
+
       if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
         if (gameState.status === 'RUNNING') pauseGame();
@@ -273,7 +275,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gameState.status, pauseGame, startGame, handleDirectionChange]);
+  }, [gameState.status, pauseGame, startGame, handleDirectionChange, isAuthDialogOpen]);
 
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     const touch = e.touches[0];
