@@ -288,10 +288,10 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
         startGame();
       } else {
         let newDirection: Direction | null = null;
-        if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') newDirection = 'UP';
-        else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') newDirection = 'DOWN';
-        else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') newDirection = 'LEFT';
-        else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') newDirection = 'RIGHT';
+        if (e.key === 'ArrowUp') newDirection = 'UP';
+        else if (e.key === 'ArrowDown') newDirection = 'DOWN';
+        else if (e.key === 'ArrowLeft') newDirection = 'LEFT';
+        else if (e.key === 'ArrowRight') newDirection = 'RIGHT';
 
         if (newDirection) {
            e.preventDefault();
@@ -372,7 +372,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
                         <div className="mt-8 text-muted-foreground grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="text-left">
                                 <p className='font-bold text-primary'>Controls:</p>
-                                <p>W/A/S/D or Arrow Keys</p>
+                                <p>Arrow Keys</p>
                                 <p>Spacebar to Pause</p>
                             </div>
                              <div className="text-left">
