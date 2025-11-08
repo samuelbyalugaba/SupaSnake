@@ -7,7 +7,7 @@ import { useSounds } from '@/hooks/use-sounds';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import AuthDialog from '@/components/auth/AuthDialog';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Volume2, VolumeX, Sparkles } from 'lucide-react';
 import { GRID_SIZE, CANVAS_SIZE_DESKTOP, INITIAL_SNAKE_POSITION, INITIAL_DIRECTION, GAME_SPEED_START, GAME_SPEED_INCREMENT, MAX_LEVEL, FOOD_PER_LEVEL, SCORE_INCREMENT } from '@/lib/constants';
@@ -50,6 +50,17 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
     onStateChange(gameState);
   }, [gameState, onStateChange]);
 
+  // Effect to handle side-effects on game over, like showing a toast.
+  useEffect(() => {
+    if (gameState.status === 'GAME_OVER' && gameState.score > highScore) {
+       if (user && db && gameState.score > 0) {
+        toast({ title: "New High Score!", description: "Your score has been saved to the leaderboard." });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState.status]);
+
+
   const generateFood = useCallback((snake: Point[]): Point => {
     let foodPosition: Point;
     do {
@@ -90,7 +101,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
     }
   }, [gameState.status]);
 
-  const gameOver = useCallback(async () => {
+  const gameOver = useCallback(() => {
     setGameState(prev => ({ ...prev, status: 'GAME_OVER' }));
     playSound('gameOver');
     if (gameState.score > highScore) {
@@ -105,10 +116,9 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
           timestamp: serverTimestamp(),
         };
         setDocumentNonBlocking(scoreRef, scoreData, { merge: true });
-        toast({ title: "New High Score!", description: "Your score has been saved to the leaderboard." });
       }
     }
-  }, [gameState.score, highScore, playSound, user, toast, db]);
+  }, [gameState.score, highScore, playSound, user, db]);
 
 
   const updateGame = useCallback(() => {
