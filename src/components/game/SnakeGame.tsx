@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -6,11 +7,12 @@ import { useSounds } from '@/hooks/use-sounds';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import AuthDialog from '@/components/auth/AuthDialog';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Volume2, VolumeX, Sparkles } from 'lucide-react';
 import { GRID_SIZE, CANVAS_SIZE_DESKTOP, INITIAL_SNAKE_POSITION, INITIAL_DIRECTION, GAME_SPEED_START, GAME_SPEED_INCREMENT, MAX_LEVEL, FOOD_PER_LEVEL, SCORE_INCREMENT } from '@/lib/constants';
 import type { Direction, Point, GameState } from '@/lib/types';
+import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 interface SnakeGameProps {
   onStateChange: (state: GameState) => void;
@@ -95,17 +97,15 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
       setHighScore(gameState.score);
       localStorage.setItem('highScore', String(gameState.score));
       if (user && db && gameState.score > 0) {
-        try {
-          await addDoc(collection(db, 'highscores'), {
-            userId: user.uid,
-            username: user.displayName || user.email,
-            score: gameState.score,
-            timestamp: serverTimestamp(),
-          });
-          toast({ title: "New High Score!", description: "Your score has been saved to the leaderboard." });
-        } catch (error) {
-          toast({ variant: 'destructive', title: "Error", description: "Could not save high score." });
-        }
+        const scoreRef = doc(db, 'highscores', user.uid);
+        const scoreData = {
+          userId: user.uid,
+          username: user.displayName || user.email,
+          score: gameState.score,
+          timestamp: serverTimestamp(),
+        };
+        setDocumentNonBlocking(scoreRef, scoreData, { merge: true });
+        toast({ title: "New High Score!", description: "Your score has been saved to the leaderboard." });
       }
     }
   }, [gameState.score, highScore, playSound, user, toast, db]);
@@ -369,3 +369,5 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
 };
 
 export default SnakeGame;
+
+    

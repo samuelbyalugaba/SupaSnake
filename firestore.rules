@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Firestore Security Rules for Neon Snake Game
  *
@@ -6,13 +7,13 @@
  *
  * Data Structure:
  * - User profiles are stored in `/users/{userId}`.
- * - A global leaderboard of high scores is stored in `/highscores/{scoreId}`.
+ * - A global leaderboard of high scores is stored in `/highscores/{userId}`.
  *
  * Key Security Decisions:
  * - Users can only create, read, update, and delete their own profile data.
- * - Any authenticated user can write to the highscores collection to submit their score.
+ * - Authenticated users can only write to their own high score document.
  * - All users (authenticated or not) can read the highscores for the leaderboard.
- * - The ruleset relies on path-based authorization for user profiles.
+ * - The ruleset relies on path-based authorization for user profiles and high scores.
  *
  */
 rules_version = '2';
@@ -35,17 +36,17 @@ service cloud.firestore {
 
     /**
      * @description Controls access to the global high score leaderboard.
-     * @path /highscores/{highScoreId}
+     * Each user can have one document, with the doc ID being their UID.
+     * @path /highscores/{userId}
      */
-    match /highscores/{highScoreId} {
+    match /highscores/{userId} {
       // Anyone can read the leaderboard
       allow get, list: if true;
 
-      // Only authenticated users can create a new high score
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-
-      // Scores cannot be updated or deleted by clients
-      allow update, delete: if false;
+      // A user can only write to their own score document.
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
+
+    

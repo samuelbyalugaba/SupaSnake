@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -31,10 +32,6 @@
       "type": "object",
       "description": "Represents a high score achieved by a user in the Neon Snake game.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the high score entry."
-        },
         "userId": {
           "type": "string",
           "description": "Reference to the user who achieved the score."
@@ -81,15 +78,17 @@
         }
       },
       {
-        "path": "/highscores/{highScoreId}",
+        "path": "/highscores/{userId}",
         "definition": {
           "entityName": "HighScore",
           "schema": {
             "$ref": "#/backend/entities/HighScore"
           },
-          "description": "Stores high scores for the global leaderboard. Writable by any authenticated user, readable by all."
+          "description": "Stores a user's single highest score for the global leaderboard. The document ID is the user's UID. Writable by the owner, readable by all."
         }
       }
     ]
   }
 }
+
+    
