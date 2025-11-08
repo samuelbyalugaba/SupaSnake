@@ -1,0 +1,77 @@
+/**
+ * @fileoverview Firestore Security Rules for Neon Snake Game
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for user profiles and high scores.
+ *
+ * Data Structure:
+ * - User profiles are stored in `/users/{userId}`.
+ * - High scores are stored in `/users/{userId}/highscores/{highScoreId}`.
+ *
+ * Key Security Decisions:
+ * - Users can only create, read, update, and delete their own profile data.
+ * - Users can only create, read, update, and delete their own high score data.
+ * - Listing high scores is restricted to the owner of the high scores (the user whose ID is in the path).
+ * - The ruleset relies on path-based authorization, where the `userId` in the path must match `request.auth.uid`.
+ *
+ * Denormalization for Authorization:
+ * The `userId` field is present on the HighScore documents to allow direct validation against `request.auth.uid`.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Controls access to user profile data.
+     * @path /users/{userId}
+     * @allow (create) - User with UID 'user_abc' can create their own profile at /users/user_abc if the document.id matches their UID.
+     * @allow (get, update, delete) - User with UID 'user_abc' can read, update, or delete their own profile at /users/user_abc.
+     * @deny (create) - User with UID 'user_xyz' cannot create a profile at /users/user_abc.
+     * @deny (get, update, delete) - User with UID 'user_xyz' cannot read, update, or delete the profile at /users/user_abc.
+     * @principle Enforces document ownership for all operations on the user profile.
+     */
+    match /users/{userId} {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false; // User listing is not allowed.
+
+      allow create: if isOwner(userId) && request.resource.data.id == request.auth.uid;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to high score data for a specific user.
+     * @path /users/{userId}/highscores/{highScoreId}
+     * @allow (create) - User with UID 'user_abc' can create a high score under their profile at /users/user_abc/highscores/score_1 if the document.userId matches their UID.
+     * @allow (get, list, update, delete) - User with UID 'user_abc' can read, list, update, or delete their own high score at /users/user_abc/highscores/score_1.
+     * @deny (create) - User with UID 'user_xyz' cannot create a high score under another user's profile at /users/user_abc/highscores/score_1.
+     * @deny (get, list, update, delete) - User with UID 'user_xyz' cannot read, list, update, or delete a high score under another user's profile at /users/user_abc/highscores/score_1.
+     * @principle Enforces document ownership for all operations on high scores, ensuring users can only manage their own scores.
+     */
+    match /users/{userId}/highscores/{highScoreId} {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+        function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) && request.resource.data.userId == request.auth.uid;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+  }
+}
