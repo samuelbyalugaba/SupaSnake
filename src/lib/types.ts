@@ -1,3 +1,4 @@
+
 export type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 export type Point = { x: number; y: number };
 export type GameStatus = 'IDLE' | 'RUNNING' | 'PAUSED' | 'GAME_OVER';
@@ -19,4 +20,12 @@ export type GameState = {
   level: number;
   foodEatenThisLevel: number;
   status: GameStatus;
+};
+
+export type Message = {
+  id?: string;
+  userId: string;
+  username: string;
+  text: string;
+  timestamp: any; // Firestore Timestamp
 };

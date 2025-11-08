@@ -8,9 +8,12 @@ import AIChatbot from '@/components/ai/AIChatbot';
 import type { GameState } from '@/lib/types';
 import { Gamepad2 } from 'lucide-react';
 import AuthButton from '@/components/auth/AuthButton';
+import GlobalChat from '@/components/game/GlobalChat';
+import { useUser } from '@/firebase';
 
 export default function Home() {
   const [gameState, setGameState] = React.useState<GameState | null>(null);
+  const { user } = useUser();
 
   return (
     <div className="relative min-h-screen w-full bg-background text-foreground flex flex-col items-center justify-center p-4 font-headline overflow-hidden">
@@ -30,6 +33,7 @@ export default function Home() {
 
           <div className="w-full flex flex-col gap-8">
             <Leaderboard />
+            { user && <GlobalChat /> }
             <AIChatbot />
           </div>
         </div>
