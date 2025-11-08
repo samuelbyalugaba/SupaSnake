@@ -23,7 +23,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
   const { user } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
-  const { isMuted, toggleMute, playSound } = useSounds();
+  const { playSound, isMuted, toggleMute } = useSounds();
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
   const [highScore, setHighScore] = useState(0);
 
@@ -46,19 +46,21 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
   useEffect(() => {
     const fetchHighScore = async () => {
       if (user && db) {
+        // When user logs in, reset high score to avoid showing stale local storage value
+        setHighScore(0); 
         const scoreRef = doc(db, 'highscores', user.uid);
         const scoreSnap = await getDoc(scoreRef);
         if (scoreSnap.exists()) {
           setHighScore(scoreSnap.data().score);
-        } else {
-          setHighScore(0);
         }
       } else {
-        setHighScore(Number(localStorage.getItem('highScore') || '0'));
+        // For logged-out users, use local storage
+        const localHighScore = Number(localStorage.getItem('highScore') || '0');
+        setHighScore(localHighScore);
       }
     };
     fetchHighScore();
-  }, [user, db, gameState.status]);
+  }, [user, db]);
   
   useEffect(() => {
     onStateChange(gameState);
@@ -71,8 +73,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
         toast({ title: "New High Score!", description: "Your score has been saved to the leaderboard." });
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState.status]);
+  }, [gameState.status, gameState.score, highScore, user, db, toast]);
 
 
   const generateFood = useCallback((snake: Point[]): Point => {
@@ -116,26 +117,27 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
   }, [gameState.status]);
 
   const gameOver = useCallback(() => {
-    setGameState(prev => ({ ...prev, status: 'GAME_OVER' }));
     playSound('gameOver');
-    if (gameState.score > highScore) {
-      if (user && db && gameState.score > 0) {
-        const scoreRef = doc(db, 'highscores', user.uid);
-        const scoreData = {
-          userId: user.uid,
-          username: user.displayName || user.email,
-          score: gameState.score,
-          timestamp: serverTimestamp(),
-        };
-        setDocumentNonBlocking(scoreRef, scoreData, { merge: true });
-        setHighScore(gameState.score); // update high score in UI
-      } else {
-         // For non-logged in users, use local storage
-         localStorage.setItem('highScore', String(gameState.score));
-         setHighScore(gameState.score); // update high score in UI
-      }
-    }
-  }, [gameState.score, highScore, playSound, user, db]);
+    setGameState(prev => {
+        if (prev.score > highScore) {
+            if (user && db && prev.score > 0) {
+                const scoreRef = doc(db, 'highscores', user.uid);
+                const scoreData = {
+                    userId: user.uid,
+                    username: user.displayName || user.email,
+                    score: prev.score,
+                    timestamp: serverTimestamp(),
+                };
+                setDocumentNonBlocking(scoreRef, scoreData, { merge: true });
+                setHighScore(prev.score);
+            } else {
+                localStorage.setItem('highScore', String(prev.score));
+                setHighScore(prev.score);
+            }
+        }
+        return { ...prev, status: 'GAME_OVER' };
+    });
+}, [playSound, highScore, user, db]);
 
 
   const updateGame = useCallback(() => {
@@ -396,5 +398,3 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ onStateChange }) => {
 };
 
 export default SnakeGame;
-
-    

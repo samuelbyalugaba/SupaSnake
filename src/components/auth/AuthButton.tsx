@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -17,6 +18,7 @@ const AuthButton = () => {
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      localStorage.removeItem('highScore');
       toast({ title: 'Logged out successfully.' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not log out.' });
