@@ -13,13 +13,14 @@ import { INITIAL_SNAKE_POSITION } from '@/lib/constants';
 
 const DIFFICULTY_SETTINGS = {
   easy: { speed: 200, foodMoves: false, hasObstacles: false, speedIncrement: 0.95, foodPerLevel: 5, maxLevel: 5 },
-  medium: { speed: 180, foodMoves: true, hasObstacles: false, speedIncrement: 0.9, foodPerLevel: 5, maxLevel: 10 },
-  hard: { speed: 85, foodMoves: true, hasObstacles: true, speedIncrement: 0.9, foodPerLevel: 5, maxLevel: 15 },
+  medium: { speed: 200, foodMoves: true, hasObstacles: false, speedIncrement: 0.9, foodPerLevel: 4, maxLevel: 10 },
+  hard: { speed: 200, foodMoves: true, hasObstacles: true, speedIncrement: 0.9, foodPerLevel: 3, maxLevel: 15 },
 };
 
 const OBSTACLE_WALL_COUNT = 4;
 const MIN_WALL_LENGTH = 4;
 const MAX_WALL_LENGTH = 7;
+const FOOD_MOVE_INTERVAL = 250; // Rat moves at a fixed interval
 
 const INITIAL_DIRECTION: Direction = 'RIGHT';
 
@@ -32,7 +33,6 @@ interface SnakeGameProps {
 
 const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, difficulty, onExit }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gameLoopRef = useRef<number | null>(null);
   const touchStartRef = useRef<Point | null>(null);
 
   const { playSound } = useSounds();
@@ -96,7 +96,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
       foodDirection: 'RIGHT' as Direction,
       speed: settings.speed,
     };
-  }, [generateFood, settings.speed]);
+  }, [generateFood, settings.speed, obstacles]);
 
   const gameLogicState = useRef(createInitialState());
   const [displayState, setDisplayState] = useState({
@@ -199,6 +199,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
   }, [settings.hasObstacles, obstacles]);
 
   const updateGame = useCallback(() => {
+    if (displayState.status !== 'RUNNING') return;
     const state = gameLogicState.current;
     const head = { ...state.snake[0] };
 
@@ -229,39 +230,15 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     } else {
       state.snake.pop();
     }
-
-    if (settings.foodMoves) {
-        const validMoves: Direction[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'].filter(dir => {
-            let { x, y } = state.food;
-            if (dir === 'UP') y--; else if (dir === 'DOWN') y++;
-            else if (dir === 'LEFT') x--; else if (dir === 'RIGHT') x++;
-            return x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE;
-        });
-        if (validMoves.length > 0) {
-            if (!validMoves.includes(state.foodDirection)) {
-                state.foodDirection = validMoves[Math.floor(Math.random() * validMoves.length)];
-            }
-            const newFood = { ...state.food };
-            switch (state.foodDirection) {
-                case 'UP': newFood.y = Math.max(0, newFood.y - 1); break;
-                case 'DOWN': newFood.y = Math.min(GRID_SIZE - 1, newFood.y + 1); break;
-                case 'LEFT': newFood.x = Math.max(0, newFood.x - 1); break;
-                case 'RIGHT': newFood.x = Math.min(GRID_SIZE - 1, newFood.x + 1); break;
-            }
-             if (!obstacles.some(o => o.x === newFood.x && o.y === newFood.y)) {
-                state.food = newFood;
-            }
-        }
-    }
-
+    
     if (scoreChanged) {
       setDisplayState(prev => {
         const newScore = prev.score + SCORE_INCREMENT;
-        const foodEatenThisLevel = (prev.score / SCORE_INCREMENT + 1) % settings.foodPerLevel;
+        const foodEaten = (newScore / SCORE_INCREMENT);
         let newLevel = prev.level;
         let newSpeed = gameLogicState.current.speed;
 
-        if (newLevel < settings.maxLevel && foodEatenThisLevel === 0) {
+        if (newLevel < settings.maxLevel && foodEaten % settings.foodPerLevel === 0) {
           newLevel++;
           newSpeed *= settings.speedIncrement;
           gameLogicState.current.speed = newSpeed;
@@ -269,7 +246,35 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
         return { ...prev, score: newScore, level: newLevel };
       });
     }
-  }, [playSound, generateFood, settings, obstacles]);
+  }, [playSound, generateFood, settings, obstacles, displayState.status]);
+
+  const moveFood = useCallback(() => {
+    if (displayState.status !== 'RUNNING' || !settings.foodMoves) return;
+    const state = gameLogicState.current;
+
+    const validMoves: Direction[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'].filter(dir => {
+        let { x, y } = state.food;
+        if (dir === 'UP') y--; else if (dir === 'DOWN') y++;
+        else if (dir === 'LEFT') x--; else if (dir === 'RIGHT') x++;
+        return x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE && !obstacles.some(o => o.x === x && o.y === y);
+    });
+    
+    if (validMoves.length > 0) {
+        if (!validMoves.includes(state.foodDirection)) {
+            state.foodDirection = validMoves[Math.floor(Math.random() * validMoves.length)];
+        }
+        const newFood = { ...state.food };
+        switch (state.foodDirection) {
+            case 'UP': newFood.y = Math.max(0, newFood.y - 1); break;
+            case 'DOWN': newFood.y = Math.min(GRID_SIZE - 1, newFood.y + 1); break;
+            case 'LEFT': newFood.x = Math.max(0, newFood.x - 1); break;
+            case 'RIGHT': newFood.x = Math.min(GRID_SIZE - 1, newFood.x + 1); break;
+        }
+        if (!state.snake.some(s => s.x === newFood.x && s.y === newFood.y)) {
+           state.food = newFood;
+        }
+    }
+  }, [displayState.status, settings.foodMoves, obstacles]);
   
   useEffect(() => {
     draw();
@@ -277,13 +282,21 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
 
   useEffect(() => {
     if (displayState.status === 'RUNNING') {
-        const interval = setInterval(() => {
+        const gameInterval = setInterval(() => {
             updateGame();
             draw();
         }, gameLogicState.current.speed);
-        return () => clearInterval(interval);
+
+        const foodInterval = settings.foodMoves ? setInterval(() => {
+            moveFood();
+        }, FOOD_MOVE_INTERVAL) : null;
+
+        return () => {
+            clearInterval(gameInterval);
+            if (foodInterval) clearInterval(foodInterval);
+        };
     }
-  }, [displayState.status, draw, updateGame, gameLogicState.current.speed]);
+  }, [displayState.status, draw, updateGame, moveFood, settings.foodMoves]);
 
   const startGame = useCallback(() => {
     setDisplayState(prev => ({ ...prev, status: 'RUNNING' }));
