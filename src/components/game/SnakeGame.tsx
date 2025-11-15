@@ -5,8 +5,8 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Maximize, Minimize, Pause, Play, ArrowLeft } from 'lucide-react';
-import { GRID_SIZE, CANVAS_SIZE_DESKTOP, INITIAL_SNAKE_POSITION, INITIAL_DIRECTION, SCORE_INCREMENT } from '@/lib/constants';
-import type { Direction, Point, GameState, Difficulty, GameStatus } from '@/lib/types';
+import { GRID_SIZE, INITIAL_SNAKE_POSITION, INITIAL_DIRECTION, SCORE_INCREMENT } from '@/lib/constants';
+import type { Direction, Point, Difficulty, GameStatus } from '@/lib/types';
 import { useSounds } from '@/hooks/use-sounds';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -28,9 +28,8 @@ interface SnakeGameProps {
 const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, difficulty, onExit }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const touchStartRef = useRef<Point | null>(null);
+  const gameLoopIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const { playSound } = useSounds();
-  const { toast } = useToast();
-
   const settings = DIFFICULTY_SETTINGS[difficulty];
 
   const obstacles = useMemo(() => {
@@ -68,14 +67,13 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     return {
       snake: initialSnake,
       food: generateFood(initialSnake),
-      foodDirection: 'RIGHT' as Direction,
       direction: INITIAL_DIRECTION,
+      foodDirection: 'RIGHT' as Direction,
       speed: settings.speed,
     };
   }, [generateFood, settings.speed]);
 
   const gameLogicState = useRef(createInitialState());
-  
   const [displayState, setDisplayState] = useState({
     score: 0,
     level: 1,
@@ -88,33 +86,27 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
   }, [playSound]);
 
   const startGame = useCallback(() => {
-    const currentStatus = displayState.status;
-
-    if (currentStatus === 'RUNNING') return;
-
-    if (currentStatus === 'IDLE' || currentStatus === 'GAME_OVER') {
-        gameLogicState.current = createInitialState();
-        setDisplayState({ score: 0, level: 1, status: 'RUNNING' });
-    } else if (currentStatus === 'PAUSED') {
-        setDisplayState(prev => ({ ...prev, status: 'RUNNING' }));
+    if (displayState.status === 'IDLE' || displayState.status === 'GAME_OVER') {
+      gameLogicState.current = createInitialState();
+      setDisplayState({ score: 0, level: 1, status: 'RUNNING' });
+    } else if (displayState.status === 'PAUSED') {
+      setDisplayState(prev => ({ ...prev, status: 'RUNNING' }));
     }
-  }, [createInitialState, displayState.status]);
+  }, [displayState.status, createInitialState]);
 
   const pauseGame = useCallback(() => {
     if (displayState.status === 'RUNNING') {
       setDisplayState(prev => ({ ...prev, status: 'PAUSED' }));
     }
   }, [displayState.status]);
-  
+
   const togglePause = useCallback(() => {
     if (displayState.status === 'RUNNING') pauseGame();
     else if (displayState.status === 'PAUSED') startGame();
-  }, [pauseGame, startGame, displayState.status]);
-
+  }, [displayState.status, pauseGame, startGame]);
 
   const handleDirectionChange = useCallback((newDirection: Direction) => {
     if (displayState.status !== 'RUNNING') return;
-    
     const { direction } = gameLogicState.current;
     if (
         (direction === 'UP' && newDirection === 'DOWN') ||
@@ -130,10 +122,14 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
   // Main Game Loop Effect
   useEffect(() => {
     if (displayState.status !== 'RUNNING') {
+        if (gameLoopIntervalRef.current) {
+            clearInterval(gameLoopIntervalRef.current);
+            gameLoopIntervalRef.current = null;
+        }
         return;
     }
 
-    const gameInterval = setInterval(() => {
+    const gameTick = () => {
         const state = gameLogicState.current;
         const head = { ...state.snake[0] };
         switch (state.direction) {
@@ -153,8 +149,8 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
         }
 
         state.snake.unshift(head);
-
         let scoreChanged = false;
+
         if (head.x === state.food.x && head.y === state.food.y) {
             playSound('eat');
             scoreChanged = true;
@@ -163,16 +159,13 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
             state.snake.pop();
         }
 
-        // Food movement logic can stay here
         if (settings.foodMoves) {
-            // ... (food movement logic - simplified for brevity)
             const validMoves: Direction[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'].filter(dir => {
                 let { x, y } = state.food;
                 if (dir === 'UP') y--; else if (dir === 'DOWN') y++;
                 else if (dir === 'LEFT') x--; else if (dir === 'RIGHT') x++;
                 return x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE && !state.snake.some(s => s.x === x && s.y === y);
             });
-
             if (validMoves.length > 0) {
                 if (!validMoves.includes(state.foodDirection)) {
                     state.foodDirection = validMoves[Math.floor(Math.random() * validMoves.length)];
@@ -197,121 +190,133 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
                 if (newLevel < settings.maxLevel && foodEatenThisLevel === 0) {
                     newLevel++;
                     gameLogicState.current.speed *= settings.speedIncrement;
+                    if(gameLoopIntervalRef.current) {
+                        clearInterval(gameLoopIntervalRef.current);
+                        gameLoopIntervalRef.current = setInterval(gameTick, gameLogicState.current.speed);
+                    }
                 }
                 return { ...prev, score: newScore, level: newLevel };
             });
         }
-    }, gameLogicState.current.speed);
+    };
+    
+    if(gameLoopIntervalRef.current) clearInterval(gameLoopIntervalRef.current);
+    gameLoopIntervalRef.current = setInterval(gameTick, gameLogicState.current.speed);
 
-    return () => clearInterval(gameInterval);
+    return () => {
+        if (gameLoopIntervalRef.current) {
+            clearInterval(gameLoopIntervalRef.current);
+        }
+    };
   }, [displayState.status, gameOver, playSound, generateFood, settings, obstacles]);
 
-  // Drawing effect
+  // Drawing effect (uses requestAnimationFrame for smooth visuals)
   useEffect(() => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const context = canvas.getContext('2d');
-      if (!context) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    let animationFrameId: number;
+    
+    const draw = () => {
+      const state = gameLogicState.current;
+      const canvasSize = context.canvas.width;
+      const cellSize = canvasSize / GRID_SIZE;
       
-      const draw = () => {
-        const state = gameLogicState.current;
-        const canvasSize = context.canvas.width;
-        const cellSize = canvasSize / GRID_SIZE;
-        
-        context.fillStyle = '#000000';
-        context.fillRect(0, 0, canvasSize, canvasSize);
-    
-        if (settings.hasObstacles) {
-          context.fillStyle = '#444';
-          context.shadowColor = '#222';
-          context.shadowBlur = 10;
-          obstacles.forEach(o => context.fillRect(o.x * cellSize, o.y * cellSize, cellSize, cellSize));
-          context.shadowBlur = 0;
-        }
-        
-        const food = state.food;
-        const centerX = food.x * cellSize + cellSize / 2;
-        const centerY = food.y * cellSize + cellSize / 2;
-        const bodyRadius = cellSize * 0.35;
-        context.beginPath();
-        context.moveTo(centerX + bodyRadius * 0.8, centerY + bodyRadius * 0.5);
-        context.quadraticCurveTo(centerX + bodyRadius * 2, centerY, centerX + bodyRadius * 1.5, centerY - bodyRadius * 1.5);
-        context.strokeStyle = '#E3A3B4';
-        context.lineWidth = 2;
-        context.stroke();
-        context.fillStyle = '#94a3b8';
-        context.beginPath();
-        context.arc(centerX, centerY, bodyRadius, 0, 2 * Math.PI);
-        context.fill();
-        const earRadius = bodyRadius * 0.4;
-        context.fillStyle = '#E3A3B4';
-        context.beginPath(); context.arc(centerX - bodyRadius * 0.7, centerY - bodyRadius * 0.7, earRadius, 0, 2 * Math.PI); context.fill();
-        context.beginPath(); context.arc(centerX + bodyRadius * 0.1, centerY - bodyRadius * 0.9, earRadius, 0, 2 * Math.PI); context.fill();
-        context.fillStyle = '#000';
-        context.beginPath(); context.arc(centerX - bodyRadius * 0.2, centerY - bodyRadius * 0.3, 1.5, 0, 2 * Math.PI); context.fill();
-    
-        const snake = state.snake;
-        const direction = state.direction;
-        for (let i = 1; i < snake.length; i++) {
-            const segment = snake[i];
-            const segCenterX = segment.x * cellSize + cellSize / 2;
-            const segCenterY = segment.y * cellSize + cellSize / 2;
-            const radius = cellSize / 2.2;
-            const gradient = context.createRadialGradient(segCenterX, segCenterY, 1, segCenterX, segCenterY, radius);
-            gradient.addColorStop(0, '#39FF14');
-            gradient.addColorStop(1, '#00C700');
-            context.fillStyle = gradient;
-            context.shadowColor = 'rgba(57, 255, 20, 0.5)';
-            context.shadowBlur = 8;
-            context.beginPath(); context.arc(segCenterX, segCenterY, radius, 0, 2 * Math.PI); context.fill();
-        }
-        const head = snake[0];
-        const headCenterX = head.x * cellSize + cellSize / 2;
-        const headCenterY = head.y * cellSize + cellSize / 2;
-        const headRadius = cellSize / 2;
-        const headGradient = context.createRadialGradient(headCenterX, headCenterY, 2, headCenterX, headCenterY, headRadius);
-        headGradient.addColorStop(0, '#5CFF4D');
-        headGradient.addColorStop(1, '#00C700');
-        context.fillStyle = headGradient;
-        context.shadowColor = 'rgba(57, 255, 20, 0.7)';
-        context.shadowBlur = 15;
-        context.beginPath(); context.arc(headCenterX, headCenterY, headRadius, 0, 2 * Math.PI); context.fill();
+      context.fillStyle = '#000000';
+      context.fillRect(0, 0, canvasSize, canvasSize);
+  
+      if (settings.hasObstacles) {
+        context.fillStyle = '#444';
+        context.shadowColor = '#222';
+        context.shadowBlur = 10;
+        obstacles.forEach(o => context.fillRect(o.x * cellSize, o.y * cellSize, cellSize, cellSize));
         context.shadowBlur = 0;
-        context.fillStyle = 'white';
-        const eyeRadius = cellSize * 0.1;
-        let eye1X, eye1Y, eye2X, eye2Y;
-        const eyeOffset = cellSize * 0.2;
-        switch (direction) {
-            case 'UP': eye1X = headCenterX - eyeOffset; eye1Y = headCenterY - eyeOffset; eye2X = headCenterX + eyeOffset; eye2Y = headCenterY - eyeOffset; break;
-            case 'DOWN': eye1X = headCenterX - eyeOffset; eye1Y = headCenterY + eyeOffset; eye2X = headCenterX + eyeOffset; eye2Y = headCenterY + eyeOffset; break;
-            case 'LEFT': eye1X = headCenterX - eyeOffset; eye1Y = headCenterY - eyeOffset; eye2X = headCenterX - eyeOffset; eye2Y = headCenterY + eyeOffset; break;
-            case 'RIGHT': eye1X = headCenterX + eyeOffset; eye1Y = headCenterY - eyeOffset; eye2X = headCenterX + eyeOffset; eye2Y = headCenterY + eyeOffset; break;
-        }
-        context.beginPath(); context.arc(eye1X, eye1Y, eyeRadius, 0, 2 * Math.PI); context.fill();
-        context.beginPath(); context.arc(eye2X, eye2Y, eyeRadius, 0, 2 * Math.PI); context.fill();
-        context.fillStyle = 'black';
-        const pupilRadius = eyeRadius * 0.5;
-        context.beginPath(); context.arc(eye1X, eye1Y, pupilRadius, 0, 2 * Math.PI); context.fill();
-        context.beginPath(); context.arc(eye2X, eye2Y, pupilRadius, 0, 2 * Math.PI); context.fill();
-      };
+      }
+      
+      // Draw Food (Rat)
+      const food = state.food;
+      const centerX = food.x * cellSize + cellSize / 2;
+      const centerY = food.y * cellSize + cellSize / 2;
+      const bodyRadius = cellSize * 0.35;
+      context.beginPath();
+      context.moveTo(centerX + bodyRadius * 0.8, centerY + bodyRadius * 0.5);
+      context.quadraticCurveTo(centerX + bodyRadius * 2, centerY, centerX + bodyRadius * 1.5, centerY - bodyRadius * 1.5);
+      context.strokeStyle = '#E3A3B4'; // Tail color
+      context.lineWidth = 2;
+      context.stroke();
+      context.fillStyle = '#94a3b8'; // Body color
+      context.beginPath();
+      context.arc(centerX, centerY, bodyRadius, 0, 2 * Math.PI);
+      context.fill();
+      const earRadius = bodyRadius * 0.4;
+      context.fillStyle = '#E3A3B4'; // Ear color
+      context.beginPath(); context.arc(centerX - bodyRadius * 0.7, centerY - bodyRadius * 0.7, earRadius, 0, 2 * Math.PI); context.fill();
+      context.beginPath(); context.arc(centerX + bodyRadius * 0.1, centerY - bodyRadius * 0.9, earRadius, 0, 2 * Math.PI); context.fill();
+      context.fillStyle = '#000'; // Eye
+      context.beginPath(); context.arc(centerX - bodyRadius * 0.2, centerY - bodyRadius * 0.3, 1.5, 0, 2 * Math.PI); context.fill();
+  
+      // Draw Snake
+      const snake = state.snake;
+      const direction = state.direction;
+      for (let i = 1; i < snake.length; i++) {
+          const segment = snake[i];
+          const segCenterX = segment.x * cellSize + cellSize / 2;
+          const segCenterY = segment.y * cellSize + cellSize / 2;
+          const radius = cellSize / 2.2;
+          const gradient = context.createRadialGradient(segCenterX, segCenterY, 1, segCenterX, segCenterY, radius);
+          gradient.addColorStop(0, '#39FF14');
+          gradient.addColorStop(1, '#00C700');
+          context.fillStyle = gradient;
+          context.shadowColor = 'rgba(57, 255, 20, 0.5)';
+          context.shadowBlur = 8;
+          context.beginPath(); context.arc(segCenterX, segCenterY, radius, 0, 2 * Math.PI); context.fill();
+      }
+      const head = snake[0];
+      const headCenterX = head.x * cellSize + cellSize / 2;
+      const headCenterY = head.y * cellSize + cellSize / 2;
+      const headRadius = cellSize / 2;
+      const headGradient = context.createRadialGradient(headCenterX, headCenterY, 2, headCenterX, headCenterY, headRadius);
+      headGradient.addColorStop(0, '#5CFF4D');
+      headGradient.addColorStop(1, '#00C700');
+      context.fillStyle = headGradient;
+      context.shadowColor = 'rgba(57, 255, 20, 0.7)';
+      context.shadowBlur = 15;
+      context.beginPath(); context.arc(headCenterX, headCenterY, headRadius, 0, 2 * Math.PI); context.fill();
+      context.shadowBlur = 0;
+      context.fillStyle = 'white';
+      const eyeRadius = cellSize * 0.1;
+      let eye1X, eye1Y, eye2X, eye2Y;
+      const eyeOffset = cellSize * 0.2;
+      switch (direction) {
+          case 'UP': eye1X = headCenterX - eyeOffset; eye1Y = headCenterY - eyeOffset; eye2X = headCenterX + eyeOffset; eye2Y = headCenterY - eyeOffset; break;
+          case 'DOWN': eye1X = headCenterX - eyeOffset; eye1Y = headCenterY + eyeOffset; eye2X = headCenterX + eyeOffset; eye2Y = headCenterY + eyeOffset; break;
+          case 'LEFT': eye1X = headCenterX - eyeOffset; eye1Y = headCenterY - eyeOffset; eye2X = headCenterX - eyeOffset; eye2Y = headCenterY + eyeOffset; break;
+          case 'RIGHT': eye1X = headCenterX + eyeOffset; eye1Y = headCenterY - eyeOffset; eye2X = headCenterX + eyeOffset; eye2Y = headCenterY + eyeOffset; break;
+      }
+      context.beginPath(); context.arc(eye1X, eye1Y, eyeRadius, 0, 2 * Math.PI); context.fill();
+      context.beginPath(); context.arc(eye2X, eye2Y, eyeRadius, 0, 2 * Math.PI); context.fill();
+      context.fillStyle = 'black';
+      const pupilRadius = eyeRadius * 0.5;
+      context.beginPath(); context.arc(eye1X, eye1Y, pupilRadius, 0, 2 * Math.PI); context.fill();
+      context.beginPath(); context.arc(eye2X, eye2Y, pupilRadius, 0, 2 * Math.PI); context.fill();
+    };
 
-      let animationFrameId: number;
-      const render = () => {
-          draw();
-          animationFrameId = requestAnimationFrame(render);
-      };
-      render();
+    const render = () => {
+        draw();
+        animationFrameId = requestAnimationFrame(render);
+    };
+    render();
 
-      return () => cancelAnimationFrame(animationFrameId);
+    return () => cancelAnimationFrame(animationFrameId);
   }, [settings.hasObstacles, obstacles]);
 
-
   const getCanvasSize = useCallback(() => {
-    if (typeof window === 'undefined') return CANVAS_SIZE_DESKTOP;
+    if (typeof window === 'undefined') return 600; // CANVAS_SIZE_DESKTOP
     if (isFullScreen) {
         return Math.min(window.innerWidth, window.innerHeight) * 0.9;
     }
-    return CANVAS_SIZE_DESKTOP;
+    return 600;
   }, [isFullScreen]);
 
   // Resize effect
@@ -328,14 +333,14 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     return () => window.removeEventListener('resize', resizeCanvas);
   }, [getCanvasSize]);
 
-
+  // Keyboard and Touch controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-       if (document.activeElement && (['input', 'textarea'].includes(document.activeElement.tagName.toLowerCase()))) {
+      if (document.activeElement && ['input', 'textarea'].includes(document.activeElement.tagName.toLowerCase())) {
         return;
       }
       e.preventDefault();
-      if (e.key === ' ' || e.code === 'Space') togglePause();
+      if (e.code === 'Space') togglePause();
       else if (e.key === 'Enter' && (displayState.status === 'IDLE' || displayState.status === 'GAME_OVER')) startGame();
       else if (e.key === 'f' || e.key === 'F') toggleFullScreen();
       else {
@@ -347,7 +352,6 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
         if (newDirection) handleDirectionChange(newDirection);
       }
     };
-    
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePause, startGame, handleDirectionChange, toggleFullScreen, displayState.status]);
