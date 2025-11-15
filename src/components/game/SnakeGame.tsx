@@ -9,15 +9,15 @@ import { GRID_SIZE, SCORE_INCREMENT } from '@/lib/constants';
 import type { Direction, Point, Difficulty, GameStatus } from '@/lib/types';
 import { useSounds } from '@/hooks/use-sounds';
 import { cn } from '@/lib/utils';
+import { INITIAL_SNAKE_POSITION } from '@/lib/constants';
 
 const DIFFICULTY_SETTINGS = {
-  easy: { speed: 150, foodMoves: false, hasObstacles: false, speedIncrement: 0.95, foodPerLevel: 5, maxLevel: 5 },
-  medium: { speed: 100, foodMoves: true, hasObstacles: false, speedIncrement: 0.9, foodPerLevel: 5, maxLevel: 10 },
+  easy: { speed: 200, foodMoves: false, hasObstacles: false, speedIncrement: 0.95, foodPerLevel: 5, maxLevel: 5 },
+  medium: { speed: 120, foodMoves: true, hasObstacles: false, speedIncrement: 0.9, foodPerLevel: 5, maxLevel: 10 },
   hard: { speed: 85, foodMoves: true, hasObstacles: true, speedIncrement: 0.9, foodPerLevel: 5, maxLevel: 15 },
 };
 const OBSTACLE_COUNT = 5;
 
-const INITIAL_SNAKE_POSITION: Point[] = [{ x: 10, y: 10 }];
 const INITIAL_DIRECTION: Direction = 'RIGHT';
 
 interface SnakeGameProps {
@@ -29,6 +29,7 @@ interface SnakeGameProps {
 
 const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, difficulty, onExit }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const gameLoopRef = useRef<NodeJS.Timeout>();
   const touchStartRef = useRef<Point | null>(null);
 
   const { playSound } = useSounds();
@@ -75,15 +76,14 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
       foodDirection: 'RIGHT' as Direction,
       speed: settings.speed,
     };
-  }, [generateFood, settings.speed]);
+  }, [generateFood, settings.speed, obstacles]);
 
+  const gameLogicState = useRef(createInitialState());
   const [displayState, setDisplayState] = useState({
     score: 0,
     level: 1,
     status: 'IDLE' as GameStatus,
   });
-
-  const gameLogicState = useRef(createInitialState());
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -103,9 +103,9 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
       context.shadowColor = '#222';
       context.shadowBlur = 10;
       obstacles.forEach(o => context.fillRect(o.x * cellSize, o.y * cellSize, cellSize, cellSize));
-      context.shadowBlur = 0;
-      context.shadowColor = 'transparent';
     }
+    context.shadowBlur = 0;
+    context.shadowColor = 'transparent';
 
     const food = state.food;
     const centerX = food.x * cellSize + cellSize / 2;
@@ -143,6 +143,9 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
         context.shadowBlur = 8;
         context.beginPath(); context.arc(segCenterX, segCenterY, radius, 0, 2 * Math.PI); context.fill();
     }
+    context.shadowBlur = 0;
+    context.shadowColor = 'transparent';
+
     const head = snake[0];
     const headCenterX = head.x * cellSize + cellSize / 2;
     const headCenterY = head.y * cellSize + cellSize / 2;
@@ -156,6 +159,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     context.beginPath(); context.arc(headCenterX, headCenterY, headRadius, 0, 2 * Math.PI); context.fill();
     context.shadowBlur = 0;
     context.shadowColor = 'transparent';
+
     context.fillStyle = 'white';
     const eyeRadius = cellSize * 0.1;
     let eye1X, eye1Y, eye2X, eye2Y;
@@ -228,7 +232,9 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
                 case 'LEFT': newFood.x = Math.max(0, newFood.x - 1); break;
                 case 'RIGHT': newFood.x = Math.min(GRID_SIZE - 1, newFood.x + 1); break;
             }
-            state.food = newFood;
+             if (!obstacles.some(o => o.x === newFood.x && o.y === newFood.y)) {
+                state.food = newFood;
+            }
         }
     }
 
@@ -247,25 +253,18 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
         return { ...prev, score: newScore, level: newLevel };
       });
     }
-    
-    draw();
-  }, [gameOver, playSound, generateFood, settings, obstacles, draw]);
-
-  // Main Game Loop Controller
-  useEffect(() => {
-    if (displayState.status !== 'RUNNING') {
-      draw();
-      return;
-    }
-
-    const intervalId = setInterval(updateGame, gameLogicState.current.speed);
-
-    return () => clearInterval(intervalId);
-  }, [displayState.status, draw, updateGame, gameLogicState.current.speed]);
-
+  }, [gameOver, playSound, generateFood, settings, obstacles]);
 
   const startGame = useCallback(() => {
     setDisplayState(prev => ({ ...prev, status: 'RUNNING' }));
+  }, []);
+
+  const togglePause = useCallback(() => {
+    setDisplayState(prev => {
+        if (prev.status === 'RUNNING') return { ...prev, status: 'PAUSED' };
+        if (prev.status === 'PAUSED') return { ...prev, status: 'RUNNING' };
+        return prev;
+    });
   }, []);
 
   const restartGame = useCallback(() => {
@@ -276,14 +275,29 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
       status: 'RUNNING',
     });
   }, [createInitialState]);
+  
 
-  const togglePause = useCallback(() => {
-    setDisplayState(prev => {
-        if (prev.status === 'RUNNING') return { ...prev, status: 'PAUSED' };
-        if (prev.status === 'PAUSED') return { ...prev, status: 'RUNNING' };
-        return prev;
-    });
-  }, []);
+  useEffect(() => {
+    draw();
+  }, [draw, displayState.score]); 
+
+  useEffect(() => {
+    if (displayState.status === 'RUNNING') {
+      gameLoopRef.current = setInterval(() => {
+        updateGame();
+        draw();
+      }, gameLogicState.current.speed);
+    } else {
+      if (gameLoopRef.current) {
+        clearInterval(gameLoopRef.current);
+      }
+    }
+    return () => {
+      if (gameLoopRef.current) {
+        clearInterval(gameLoopRef.current);
+      }
+    };
+  }, [displayState.status, draw, updateGame, gameLogicState.current.speed]);
 
   const handleDirectionChange = useCallback((newDirection: Direction) => {
     if (displayState.status !== 'RUNNING') return;
@@ -450,7 +464,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
 
           { (displayState.status === 'RUNNING' || displayState.status === 'PAUSED') &&
             <div className='absolute bottom-1 right-1 z-20 lg:hidden'>
-              <Button variant="ghost" size="icon" className="text-white/50 hover:text-white hover:bg-white/10" onClick={(e) => { e.stopPropagation(); togglePause(); }}>
+              <Button variant="ghost" size="icon" className="text-white/50 hover:text-white hover:bg-white/10" onClick={(e) => { estopPropagation(); togglePause(); }}>
                   {displayState.status === 'PAUSED' ? <Play size={20} /> : <Pause size={20} />}
               </Button>
             </div>
@@ -462,5 +476,3 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
 };
 
 export default SnakeGame;
-
-    
