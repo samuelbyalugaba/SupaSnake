@@ -13,10 +13,13 @@ import { INITIAL_SNAKE_POSITION } from '@/lib/constants';
 
 const DIFFICULTY_SETTINGS = {
   easy: { speed: 200, foodMoves: false, hasObstacles: false, speedIncrement: 0.95, foodPerLevel: 5, maxLevel: 5 },
-  medium: { speed: 150, foodMoves: true, hasObstacles: false, speedIncrement: 0.9, foodPerLevel: 5, maxLevel: 10 },
+  medium: { speed: 180, foodMoves: true, hasObstacles: false, speedIncrement: 0.9, foodPerLevel: 5, maxLevel: 10 },
   hard: { speed: 85, foodMoves: true, hasObstacles: true, speedIncrement: 0.9, foodPerLevel: 5, maxLevel: 15 },
 };
-const OBSTACLE_COUNT = 5;
+
+const OBSTACLE_WALL_COUNT = 4;
+const MIN_WALL_LENGTH = 4;
+const MAX_WALL_LENGTH = 7;
 
 const INITIAL_DIRECTION: Direction = 'RIGHT';
 
@@ -29,7 +32,7 @@ interface SnakeGameProps {
 
 const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, difficulty, onExit }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
+  const gameLoopRef = useRef<number | null>(null);
   const touchStartRef = useRef<Point | null>(null);
 
   const { playSound } = useSounds();
@@ -37,18 +40,35 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
 
   const obstacles = useMemo(() => {
     if (!settings.hasObstacles) return [];
+    
     const newObstacles: Point[] = [];
-    let attempts = 0; // Safety break for potential infinite loops
-    while (newObstacles.length < OBSTACLE_COUNT && attempts < 1000) {
-      const obstacle = {
-        x: Math.floor(Math.random() * GRID_SIZE),
-        y: Math.floor(Math.random() * GRID_SIZE),
-      };
-      const isNearCenter = Math.abs(obstacle.x - GRID_SIZE / 2) < 4 && Math.abs(obstacle.y - GRID_SIZE / 2) < 4;
-      if (!newObstacles.some(o => o.x === obstacle.x && o.y === obstacle.y) && !isNearCenter) {
-        newObstacles.push(obstacle);
-      }
+    let attempts = 0;
+
+    while (newObstacles.length < OBSTACLE_WALL_COUNT * MIN_WALL_LENGTH && attempts < 100) {
       attempts++;
+      const wallLength = Math.floor(Math.random() * (MAX_WALL_LENGTH - MIN_WALL_LENGTH + 1)) + MIN_WALL_LENGTH;
+      const isHorizontal = Math.random() > 0.5;
+      
+      const startX = Math.floor(Math.random() * (GRID_SIZE - (isHorizontal ? wallLength : 1)));
+      const startY = Math.floor(Math.random() * (GRID_SIZE - (isHorizontal ? 1 : wallLength)));
+      
+      const wallSegment: Point[] = [];
+      let possible = true;
+
+      for (let i = 0; i < wallLength; i++) {
+        const point = isHorizontal ? { x: startX + i, y: startY } : { x: startX, y: startY + i };
+        
+        const isNearCenter = Math.abs(point.x - GRID_SIZE / 2) < 5 && Math.abs(point.y - GRID_SIZE / 2) < 5;
+        if (isNearCenter || newObstacles.some(o => o.x === point.x && o.y === point.y)) {
+          possible = false;
+          break;
+        }
+        wallSegment.push(point);
+      }
+      
+      if (possible) {
+        newObstacles.push(...wallSegment);
+      }
     }
     return newObstacles;
   }, [settings.hasObstacles]);
@@ -178,11 +198,6 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     context.beginPath(); context.arc(eye2X, eye2Y, pupilRadius, 0, 2 * Math.PI); context.fill();
   }, [settings.hasObstacles, obstacles]);
 
-  const gameOver = useCallback(() => {
-    playSound('gameOver');
-    setDisplayState(prev => ({ ...prev, status: 'GAME_OVER' }));
-  }, [playSound]);
-
   const updateGame = useCallback(() => {
     const state = gameLogicState.current;
     const head = { ...state.snake[0] };
@@ -199,7 +214,8 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     const headCollidesWithSelf = state.snake.slice(1).some(segment => segment.x === head.x && segment.y === head.y);
 
     if (headCollidesWithWall || headCollidesWithObstacle || headCollidesWithSelf) {
-      gameOver();
+      playSound('gameOver');
+      setDisplayState(prev => ({ ...prev, status: 'GAME_OVER' }));
       return;
     }
 
@@ -219,7 +235,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
             let { x, y } = state.food;
             if (dir === 'UP') y--; else if (dir === 'DOWN') y++;
             else if (dir === 'LEFT') x--; else if (dir === 'RIGHT') x++;
-            return x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE && !state.snake.some(s => s.x === x && s.y === y);
+            return x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE;
         });
         if (validMoves.length > 0) {
             if (!validMoves.includes(state.foodDirection)) {
@@ -253,18 +269,31 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
         return { ...prev, score: newScore, level: newLevel };
       });
     }
-  }, [gameOver, playSound, generateFood, settings, obstacles]);
+  }, [playSound, generateFood, settings, obstacles]);
+  
+  useEffect(() => {
+    draw();
+  }, [draw, displayState.score, obstacles]);
+
+  useEffect(() => {
+    if (displayState.status === 'RUNNING') {
+        const interval = setInterval(() => {
+            updateGame();
+            draw();
+        }, gameLogicState.current.speed);
+        return () => clearInterval(interval);
+    }
+  }, [displayState.status, draw, updateGame, gameLogicState.current.speed]);
 
   const startGame = useCallback(() => {
     setDisplayState(prev => ({ ...prev, status: 'RUNNING' }));
   }, []);
 
   const togglePause = useCallback(() => {
-    setDisplayState(prev => {
-        if (prev.status === 'RUNNING') return { ...prev, status: 'PAUSED' };
-        if (prev.status === 'PAUSED') return { ...prev, status: 'RUNNING' };
-        return prev;
-    });
+    setDisplayState(prev => ({
+      ...prev,
+      status: prev.status === 'RUNNING' ? 'PAUSED' : 'RUNNING',
+    }));
   }, []);
 
   const restartGame = useCallback(() => {
@@ -276,27 +305,6 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     });
   }, [createInitialState]);
 
-  useEffect(() => {
-    draw();
-  }, [draw, displayState.score]); 
-
-  useEffect(() => {
-    if (displayState.status === 'RUNNING') {
-      gameLoopRef.current = setInterval(() => {
-        updateGame();
-        draw();
-      }, gameLogicState.current.speed);
-    } else {
-      if (gameLoopRef.current) {
-        clearInterval(gameLoopRef.current);
-      }
-    }
-    return () => {
-      if (gameLoopRef.current) {
-        clearInterval(gameLoopRef.current);
-      }
-    };
-  }, [displayState.status, draw, updateGame, gameLogicState.current.speed]);
 
   const handleDirectionChange = useCallback((newDirection: Direction) => {
     if (displayState.status !== 'RUNNING') return;
