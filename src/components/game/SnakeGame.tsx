@@ -63,7 +63,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     );
     return foodPosition;
   }, [obstacles]);
-
+  
   const createInitialState = useCallback(() => {
     const initialSnake = INITIAL_SNAKE_POSITION;
     return {
@@ -75,116 +75,15 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     };
   }, [generateFood, settings.speed]);
 
+  // UI state that causes re-renders
   const [displayState, setDisplayState] = useState({
     score: 0,
     level: 1,
     status: 'IDLE' as GameStatus,
   });
+
+  // Game logic state that does NOT cause re-renders on every tick
   const gameLogicState = useRef(createInitialState());
-
-  const gameOver = useCallback(() => {
-    playSound('gameOver');
-    setDisplayState(prev => ({ ...prev, status: 'GAME_OVER' }));
-  }, [playSound]);
-
-  const startGame = useCallback(() => {
-    setDisplayState(prev => ({ ...prev, status: 'RUNNING' }));
-  }, []);
-
-  const restartGame = useCallback(() => {
-    gameLogicState.current = createInitialState();
-    setDisplayState({
-      score: 0,
-      level: 1,
-      status: 'RUNNING',
-    });
-  }, [createInitialState]);
-
-  const pauseGame = useCallback(() => {
-    setDisplayState(prev => ({ ...prev, status: 'PAUSED' }));
-  }, []);
-
-  const resumeGame = useCallback(() => {
-    setDisplayState(prev => ({ ...prev, status: 'RUNNING' }));
-  }, []);
-
-  const togglePause = useCallback(() => {
-    if (displayState.status === 'RUNNING') {
-      pauseGame();
-    } else if (displayState.status === 'PAUSED') {
-      resumeGame();
-    }
-  }, [displayState.status, pauseGame, resumeGame]);
-
-  const updateGame = useCallback(() => {
-    const state = gameLogicState.current;
-    const head = { ...state.snake[0] };
-
-    switch (state.direction) {
-      case 'UP': head.y -= 1; break;
-      case 'DOWN': head.y += 1; break;
-      case 'LEFT': head.x -= 1; break;
-      case 'RIGHT': head.x += 1; break;
-    }
-
-    const headCollidesWithWall = head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE;
-    const headCollidesWithObstacle = obstacles.some(o => o.x === head.x && o.y === head.y);
-    const headCollidesWithSelf = state.snake.slice(1).some(segment => segment.x === head.x && segment.y === head.y);
-
-    if (headCollidesWithWall || headCollidesWithObstacle || headCollidesWithSelf) {
-      gameOver();
-      return;
-    }
-
-    state.snake.unshift(head);
-    let scoreChanged = false;
-
-    if (head.x === state.food.x && head.y === state.food.y) {
-      playSound('eat');
-      scoreChanged = true;
-      state.food = generateFood(state.snake);
-    } else {
-      state.snake.pop();
-    }
-
-    if (settings.foodMoves) {
-        const validMoves: Direction[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'].filter(dir => {
-            let { x, y } = state.food;
-            if (dir === 'UP') y--; else if (dir === 'DOWN') y++;
-            else if (dir === 'LEFT') x--; else if (dir === 'RIGHT') x++;
-            return x >= 0 && x < GRID_SIZE && y >= 0 && x < GRID_SIZE && !state.snake.some(s => s.x === x && s.y === y);
-        });
-        if (validMoves.length > 0) {
-            if (!validMoves.includes(state.foodDirection)) {
-                state.foodDirection = validMoves[Math.floor(Math.random() * validMoves.length)];
-            }
-            const newFood = { ...state.food };
-            switch (state.foodDirection) {
-                case 'UP': newFood.y = Math.max(0, newFood.y - 1); break;
-                case 'DOWN': newFood.y = Math.min(GRID_SIZE - 1, newFood.y + 1); break;
-                case 'LEFT': newFood.x = Math.max(0, newFood.x - 1); break;
-                case 'RIGHT': newFood.x = Math.min(GRID_SIZE - 1, newFood.x + 1); break;
-            }
-            state.food = newFood;
-        }
-    }
-
-    if (scoreChanged) {
-      setDisplayState(prev => {
-        const newScore = prev.score + SCORE_INCREMENT;
-        const foodEatenThisLevel = (prev.score / SCORE_INCREMENT + 1) % settings.foodPerLevel;
-        let newLevel = prev.level;
-        let newSpeed = gameLogicState.current.speed;
-
-        if (newLevel < settings.maxLevel && foodEatenThisLevel === 0) {
-          newLevel++;
-          newSpeed *= settings.speedIncrement;
-          gameLogicState.current.speed = newSpeed;
-        }
-        return { ...prev, score: newScore, level: newLevel };
-      });
-    }
-  }, [gameOver, playSound, generateFood, settings, obstacles]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -273,22 +172,123 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     context.beginPath(); context.arc(eye2X, eye2Y, pupilRadius, 0, 2 * Math.PI); context.fill();
   }, [settings.hasObstacles, obstacles]);
 
+
+  const gameOver = useCallback(() => {
+    playSound('gameOver');
+    setDisplayState(prev => ({ ...prev, status: 'GAME_OVER' }));
+  }, [playSound]);
+
   // Main Game Loop Controller
   useEffect(() => {
-    draw(); // Draw initial state
-
     if (displayState.status !== 'RUNNING') {
-      return; // Do nothing if not running
+      // Draw one last time to show the final state (e.g., game over screen)
+      // and then do nothing.
+      draw();
+      return;
     }
 
-    const tick = () => {
-      updateGame();
+    const gameTick = () => {
+      const state = gameLogicState.current;
+      const head = { ...state.snake[0] };
+
+      switch (state.direction) {
+        case 'UP': head.y -= 1; break;
+        case 'DOWN': head.y += 1; break;
+        case 'LEFT': head.x -= 1; break;
+        case 'RIGHT': head.x += 1; break;
+      }
+
+      const headCollidesWithWall = head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE;
+      const headCollidesWithObstacle = obstacles.some(o => o.x === head.x && o.y === head.y);
+      const headCollidesWithSelf = state.snake.slice(1).some(segment => segment.x === head.x && segment.y === head.y);
+
+      if (headCollidesWithWall || headCollidesWithObstacle || headCollidesWithSelf) {
+        gameOver();
+        return;
+      }
+
+      state.snake.unshift(head);
+      let scoreChanged = false;
+
+      if (head.x === state.food.x && head.y === state.food.y) {
+        playSound('eat');
+        scoreChanged = true;
+        state.food = generateFood(state.snake);
+      } else {
+        state.snake.pop();
+      }
+
+      if (settings.foodMoves) {
+          const validMoves: Direction[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'].filter(dir => {
+              let { x, y } = state.food;
+              if (dir === 'UP') y--; else if (dir === 'DOWN') y++;
+              else if (dir === 'LEFT') x--; else if (dir === 'RIGHT') x++;
+              return x >= 0 && x < GRID_SIZE && y >= 0 && x < GRID_SIZE && !state.snake.some(s => s.x === x && s.y === y);
+          });
+          if (validMoves.length > 0) {
+              if (!validMoves.includes(state.foodDirection)) {
+                  state.foodDirection = validMoves[Math.floor(Math.random() * validMoves.length)];
+              }
+              const newFood = { ...state.food };
+              switch (state.foodDirection) {
+                  case 'UP': newFood.y = Math.max(0, newFood.y - 1); break;
+                  case 'DOWN': newFood.y = Math.min(GRID_SIZE - 1, newFood.y + 1); break;
+                  case 'LEFT': newFood.x = Math.max(0, newFood.x - 1); break;
+                  case 'RIGHT': newFood.x = Math.min(GRID_SIZE - 1, newFood.x + 1); break;
+              }
+              state.food = newFood;
+          }
+      }
+
+      if (scoreChanged) {
+        setDisplayState(prev => {
+          const newScore = prev.score + SCORE_INCREMENT;
+          const foodEatenThisLevel = (prev.score / SCORE_INCREMENT + 1) % settings.foodPerLevel;
+          let newLevel = prev.level;
+          let newSpeed = gameLogicState.current.speed;
+
+          if (newLevel < settings.maxLevel && foodEatenThisLevel === 0) {
+            newLevel++;
+            newSpeed *= settings.speedIncrement;
+            gameLogicState.current.speed = newSpeed;
+          }
+          return { ...prev, score: newScore, level: newLevel };
+        });
+      }
+      
       draw();
     };
 
-    const intervalId = setInterval(tick, gameLogicState.current.speed);
-    return () => clearInterval(intervalId); // Cleanup the interval when status changes or component unmounts
-  }, [displayState.status, draw, updateGame]);
+    // The loop starts here
+    const intervalId = setInterval(gameTick, gameLogicState.current.speed);
+
+    // Cleanup: this function runs when the component unmounts OR when the dependencies of useEffect change.
+    // In our case, it runs when displayState.status is no longer 'RUNNING'.
+    return () => clearInterval(intervalId);
+
+  }, [displayState.status, gameOver, playSound, generateFood, settings, obstacles, draw]);
+
+  const startGame = useCallback(() => {
+    setDisplayState(prev => ({ ...prev, status: 'RUNNING' }));
+  }, []);
+
+  const restartGame = useCallback(() => {
+    // Perform a full and complete reset of all state.
+    gameLogicState.current = createInitialState();
+    setDisplayState({
+      score: 0,
+      level: 1,
+      status: 'RUNNING', // This change will trigger the useEffect to start a new loop.
+    });
+  }, [createInitialState]);
+
+  const togglePause = useCallback(() => {
+    setDisplayState(prev => {
+        if (prev.status === 'RUNNING') return { ...prev, status: 'PAUSED' };
+        if (prev.status === 'PAUSED') return { ...prev, status: 'RUNNING' };
+        return prev;
+    });
+  }, []);
 
   const handleDirectionChange = useCallback((newDirection: Direction) => {
     if (displayState.status !== 'RUNNING') return;
@@ -312,6 +312,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     return 600;
   }, [isFullScreen]);
 
+  // Effect for drawing only when canvas size changes or on initial load
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -326,6 +327,8 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     return () => window.removeEventListener('resize', resizeCanvas);
   }, [getCanvasSize, draw]);
 
+
+  // Effect for keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement && ['input', 'textarea'].includes(document.activeElement.tagName.toLowerCase())) return;
@@ -338,6 +341,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
           e.preventDefault();
           if (status === 'IDLE') startGame();
           else if (status === 'GAME_OVER') restartGame();
+          else if (status === 'PAUSED') startGame();
       } else if (e.key === 'f' || e.key === 'F') {
           e.preventDefault();
           toggleFullScreen();
@@ -358,6 +362,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [displayState.status, togglePause, startGame, restartGame, handleDirectionChange, toggleFullScreen]);
 
+  // Touch controls
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const touch = e.touches[0];
@@ -384,7 +389,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
 
   const handleOverlayClick = () => {
     if (displayState.status === 'IDLE') startGame();
-    else if (displayState.status === 'PAUSED') resumeGame();
+    else if (displayState.status === 'PAUSED') startGame();
     else if (displayState.status === 'GAME_OVER') restartGame();
   };
 
@@ -463,3 +468,5 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
 };
 
 export default SnakeGame;
+
+    
