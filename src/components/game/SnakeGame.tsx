@@ -100,15 +100,19 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
   }, [displayState.status, toast]);
 
   const startGame = useCallback(() => {
-    if (gameLogicState.current.status === 'RUNNING') return;
-    
-    if (gameLogicState.current.status !== 'PAUSED') {
-      gameLogicState.current = createInitialState();
-      setDisplayState({ score: 0, level: 1, status: 'RUNNING' });
+    const currentStatus = gameLogicState.current.status;
+    if (currentStatus === 'RUNNING') return;
+  
+    if (currentStatus === 'PAUSED') {
+      // Resuming from pause
+      gameLogicState.current.status = 'RUNNING';
+      setDisplayState(prev => ({ ...prev, status: 'RUNNING' }));
     } else {
-      setDisplayState(prev => ({...prev, status: 'RUNNING' }));
+      // Starting a new game from IDLE or GAME_OVER
+      gameLogicState.current = createInitialState();
+      gameLogicState.current.status = 'RUNNING';
+      setDisplayState({ score: 0, level: 1, status: 'RUNNING' });
     }
-    gameLogicState.current.status = 'RUNNING';
   }, [createInitialState]);
 
   const pauseGame = useCallback(() => {
@@ -127,8 +131,10 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     if (gameLogicState.current.status === 'GAME_OVER') return;
     playSound('gameOver');
     gameLogicState.current.status = 'GAME_OVER';
+    const finalScore = displayState.score;
+
     setDisplayState(prev => ({ ...prev, status: 'GAME_OVER' }));
-  }, [playSound]);
+  }, [playSound, displayState.score]);
 
   const getCanvasSize = useCallback(() => {
     if (typeof window === 'undefined') return CANVAS_SIZE_DESKTOP;
@@ -486,3 +492,5 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
 };
 
 export default SnakeGame;
+
+    
