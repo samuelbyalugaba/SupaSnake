@@ -89,7 +89,15 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     setDisplayState(prev => ({ ...prev, status: 'GAME_OVER' }));
   }, [playSound]);
 
+  const startGame = useCallback(() => {
+    // This is for starting from idle or resuming from pause
+    if (displayState.status !== 'RUNNING') {
+       setDisplayState(prev => ({ ...prev, status: 'RUNNING' }));
+    }
+  }, [displayState.status]);
+
   const restartGame = useCallback(() => {
+    // This function handles a full reset from the Game Over screen
     gameLogicState.current = createInitialState();
     setDisplayState({
       score: 0,
@@ -135,7 +143,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
             let { x, y } = state.food;
             if (dir === 'UP') y--; else if (dir === 'DOWN') y++;
             else if (dir === 'LEFT') x--; else if (dir === 'RIGHT') x++;
-            return x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE && !state.snake.some(s => s.x === x && s.y === y);
+            return x >= 0 && x < GRID_SIZE && y >= 0 && x < GRID_SIZE && !state.snake.some(s => s.x === x && s.y === y);
         });
         if (validMoves.length > 0) {
             if (!validMoves.includes(state.foodDirection)) {
@@ -280,10 +288,6 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
       }
     };
   }, [displayState.status, updateGame, draw]);
-
-  const startGame = useCallback(() => {
-    setDisplayState(prev => ({ ...prev, status: 'RUNNING' }));
-  }, []);
   
   const pauseGame = useCallback(() => {
     setDisplayState(prev => ({ ...prev, status: 'PAUSED' }));
