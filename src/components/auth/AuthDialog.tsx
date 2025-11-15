@@ -71,7 +71,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ open, onOpenChange }) => {
         <DialogHeader>
           <DialogTitle>{isLogin ? 'Log In' : 'Sign Up'}</DialogTitle>
           <DialogDescription>
-            {isLogin ? "Log in to your Supa Snake account." : "Create a Supa Snake account."}
+            {isLogin ? "Log in to your Supa Snake account." : "Create a Supa Snake account to track your progress."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">

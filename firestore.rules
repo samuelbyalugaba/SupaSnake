@@ -1,4 +1,11 @@
-
+/**
+ * @fileoverview Firestore Security Rules for Supa Snake Game
+ *
+ * Core Philosophy:
+ * This ruleset starts with a secure-by-default posture.
+ * No collections are publicly accessible unless explicitly allowed.
+ *
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {

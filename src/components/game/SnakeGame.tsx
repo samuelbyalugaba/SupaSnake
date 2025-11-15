@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { useUser } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Maximize, Minimize, Pause, Play, ArrowLeft } from 'lucide-react';
@@ -10,6 +9,7 @@ import { GRID_SIZE, CANVAS_SIZE_DESKTOP, INITIAL_SNAKE_POSITION, INITIAL_DIRECTI
 import type { Direction, Point, GameState, Difficulty, GameStatus } from '@/lib/types';
 import { useSounds } from '@/hooks/use-sounds';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 const DIFFICULTY_SETTINGS = {
   easy: { speed: 150, foodMoves: false, hasObstacles: false, speedIncrement: 0.95, foodPerLevel: 5, maxLevel: 5 },
@@ -29,23 +29,11 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameLoopRef = useRef<number>();
   const touchStartRef = useRef<Point | null>(null);
-
   const { playSound } = useSounds();
+  const { toast } = useToast();
 
-  const [gameState, setGameState] = useState<GameState>({
-    snake: INITIAL_SNAKE_POSITION,
-    food: { x: -1, y: -1 }, // Initial food position, will be generated
-    foodDirection: 'RIGHT',
-    direction: INITIAL_DIRECTION,
-    speed: DIFFICULTY_SETTINGS[difficulty].speed,
-    score: 0,
-    level: 1,
-    foodEatenThisLevel: 0,
-    status: 'IDLE'
-  });
-  
   const settings = DIFFICULTY_SETTINGS[difficulty];
-  
+
   const obstacles = useMemo(() => {
     if (!settings.hasObstacles) return [];
     const newObstacles: Point[] = [];
@@ -76,80 +64,72 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     return foodPosition;
   }, [obstacles]);
 
-  const resetGame = useCallback(() => {
+  const createInitialState = useCallback(() => {
     const initialSnake = INITIAL_SNAKE_POSITION;
-    setGameState({
+    return {
       snake: initialSnake,
       food: generateFood(initialSnake),
-      foodDirection: 'RIGHT',
+      foodDirection: 'RIGHT' as Direction,
       direction: INITIAL_DIRECTION,
       speed: settings.speed,
-      foodEatenThisLevel: 0,
-      score: 0,
-      level: 1,
-      status: 'IDLE'
-    });
+      status: 'IDLE' as GameStatus,
+    };
   }, [generateFood, settings.speed]);
 
+  const gameLogicState = useRef(createInitialState());
+  
+  const [displayState, setDisplayState] = useState({
+    score: 0,
+    level: 1,
+    status: 'IDLE' as GameStatus,
+  });
+
   useEffect(() => {
-    resetGame();
-  }, [difficulty, resetGame]);
-  
-  const startGame = useCallback(() => {
-    if (gameState.status === 'RUNNING') return;
-    
-    setGameState(prev => {
-        if (prev.status !== 'PAUSED') {
-            const initialSnake = INITIAL_SNAKE_POSITION;
-            return {
-                ...prev,
-                snake: initialSnake,
-                food: generateFood(initialSnake),
-                direction: INITIAL_DIRECTION,
-                speed: settings.speed,
-                score: 0,
-                level: 1,
-                foodEatenThisLevel: 0,
-                status: 'RUNNING'
-            };
-        }
-        return { ...prev, status: 'RUNNING' };
+    gameLogicState.current = createInitialState();
+    setDisplayState({
+        score: 0,
+        level: 1,
+        status: 'IDLE'
     });
-  }, [gameState.status, generateFood, settings.speed]);
-  
-  const pauseGame = useCallback(() => {
-    if (gameState.status === 'RUNNING') {
-        setGameState(prev => ({ ...prev, status: 'PAUSED' }));
+  }, [difficulty, createInitialState]);
+
+  useEffect(() => {
+    if (displayState.status === 'GAME_OVER') {
+        // Handle any game over side effects here, like toasts
     }
-  }, [gameState.status]);
+  }, [displayState.status, toast]);
+
+  const startGame = useCallback(() => {
+    if (gameLogicState.current.status === 'RUNNING') return;
+    
+    if (gameLogicState.current.status !== 'PAUSED') {
+      gameLogicState.current = createInitialState();
+      setDisplayState({ score: 0, level: 1, status: 'RUNNING' });
+    } else {
+      setDisplayState(prev => ({...prev, status: 'RUNNING' }));
+    }
+    gameLogicState.current.status = 'RUNNING';
+  }, [createInitialState]);
+
+  const pauseGame = useCallback(() => {
+    if (gameLogicState.current.status === 'RUNNING') {
+      gameLogicState.current.status = 'PAUSED';
+      setDisplayState(prev => ({ ...prev, status: 'PAUSED' }));
+    }
+  }, []);
 
   const togglePause = useCallback(() => {
-    if (gameState.status === 'RUNNING') pauseGame();
-    else if (gameState.status === 'PAUSED') startGame();
-  }, [gameState.status, pauseGame, startGame]);
+    if (gameLogicState.current.status === 'RUNNING') pauseGame();
+    else if (gameLogicState.current.status === 'PAUSED') startGame();
+  }, [pauseGame, startGame]);
 
   const gameOver = useCallback(() => {
+    if (gameLogicState.current.status === 'GAME_OVER') return;
     playSound('gameOver');
-    setGameState(prev => ({...prev, status: 'GAME_OVER'}));
+    gameLogicState.current.status = 'GAME_OVER';
+    setDisplayState(prev => ({ ...prev, status: 'GAME_OVER' }));
   }, [playSound]);
 
-  const getValidFoodMoves = useCallback((food: Point, snake: Point[]): Direction[] => {
-    const directions: Direction[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
-    return directions.filter(dir => {
-        let { x, y } = food;
-        if (dir === 'UP') y--;
-        else if (dir === 'DOWN') y++;
-        else if (dir === 'LEFT') x--;
-        else if (dir === 'RIGHT') x++;
-
-        const willHitWall = x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE;
-        const willHitSnake = snake.some(seg => seg.x === x && seg.y === y);
-        const willHitObstacle = obstacles.some(o => o.x === x && o.y === y);
-
-        return !willHitWall && !willHitSnake && !willHitObstacle;
-    });
-  }, [obstacles]);
-  
   const getCanvasSize = useCallback(() => {
     if (typeof window === 'undefined') return CANVAS_SIZE_DESKTOP;
     if (isFullScreen) {
@@ -157,21 +137,19 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     }
     return CANVAS_SIZE_DESKTOP;
   }, [isFullScreen]);
-  
+
   const handleDirectionChange = useCallback((newDirection: Direction) => {
-    setGameState(prev => {
-        if (prev.status !== 'RUNNING') return prev;
-        const { direction } = prev;
-        if (
-            (direction === 'UP' && newDirection === 'DOWN') ||
-            (direction === 'DOWN' && newDirection === 'UP') ||
-            (direction === 'LEFT' && newDirection === 'RIGHT') ||
-            (direction === 'RIGHT' && newDirection === 'LEFT')
-        ) {
-            return prev;
-        }
-        return { ...prev, direction: newDirection };
-    });
+    const { status, direction } = gameLogicState.current;
+    if (status !== 'RUNNING') return;
+    if (
+        (direction === 'UP' && newDirection === 'DOWN') ||
+        (direction === 'DOWN' && newDirection === 'UP') ||
+        (direction === 'LEFT' && newDirection === 'RIGHT') ||
+        (direction === 'RIGHT' && newDirection === 'LEFT')
+    ) {
+        return;
+    }
+    gameLogicState.current.direction = newDirection;
   }, []);
 
   useEffect(() => {
@@ -181,21 +159,21 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
       }
       e.preventDefault();
       if (e.key === ' ' || e.code === 'Space') togglePause();
-      else if (e.key === 'Enter' && (gameState.status === 'IDLE' || gameState.status === 'GAME_OVER')) startGame();
+      else if (e.key === 'Enter' && (displayState.status === 'IDLE' || displayState.status === 'GAME_OVER')) startGame();
       else if (e.key === 'f' || e.key === 'F') toggleFullScreen();
       else {
         let newDirection: Direction | null = null;
-        if (e.key === 'ArrowUp') newDirection = 'UP';
-        else if (e.key === 'ArrowDown') newDirection = 'DOWN';
-        else if (e.key === 'ArrowLeft') newDirection = 'LEFT';
-        else if (e.key === 'ArrowRight') newDirection = 'RIGHT';
+        if (e.key === 'ArrowUp' || e.key === 'w') newDirection = 'UP';
+        else if (e.key === 'ArrowDown' || e.key === 's') newDirection = 'DOWN';
+        else if (e.key === 'ArrowLeft' || e.key === 'a') newDirection = 'LEFT';
+        else if (e.key === 'ArrowRight' || e.key === 'd') newDirection = 'RIGHT';
         if (newDirection) handleDirectionChange(newDirection);
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [togglePause, startGame, handleDirectionChange, toggleFullScreen, gameState.status]);
+  }, [togglePause, startGame, handleDirectionChange, toggleFullScreen, displayState.status]);
 
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
@@ -222,88 +200,10 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
   };
 
   const handleOverlayClick = () => {
-    if (gameState.status === 'IDLE' || gameState.status === 'GAME_OVER' || gameState.status === 'PAUSED') {
+    if (displayState.status === 'IDLE' || displayState.status === 'GAME_OVER' || displayState.status === 'PAUSED') {
       startGame();
     }
   };
-  
-  const updateGame = useCallback(() => {
-    setGameState(prev => {
-      if (prev.status !== 'RUNNING') return prev;
-      
-      let { snake, direction, food, foodDirection, score, level, foodEatenThisLevel, speed } = { ...prev };
-      let newStatus = prev.status;
-
-      const newSnake = [...snake];
-      const head = { ...newSnake[0] };
-  
-      switch (direction) {
-        case 'UP': head.y -= 1; break;
-        case 'DOWN': head.y += 1; break;
-        case 'LEFT': head.x -= 1; break;
-        case 'RIGHT': head.x += 1; break;
-      }
-  
-      const headCollidesWithWall = head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE;
-      const headCollidesWithObstacle = obstacles.some(o => o.x === head.x && o.y === head.y);
-      const headCollidesWithSelf = newSnake.slice(1).some(segment => segment.x === head.x && segment.y === head.y);
-  
-      if (headCollidesWithWall || headCollidesWithObstacle || headCollidesWithSelf) {
-        newStatus = 'GAME_OVER';
-        playSound('gameOver');
-      } else {
-        newSnake.unshift(head);
-  
-        if (head.x === food.x && head.y === food.y) {
-          playSound('eat');
-          score += SCORE_INCREMENT;
-          foodEatenThisLevel++;
-          
-          if (level < settings.maxLevel && foodEatenThisLevel >= settings.foodPerLevel) {
-            level++;
-            speed *= settings.speedIncrement;
-            foodEatenThisLevel = 0;
-          }
-          food = generateFood(newSnake);
-        } else {
-          newSnake.pop();
-        }
-        
-        if (settings.foodMoves) {
-            const validMoves = getValidFoodMoves(food, newSnake);
-            if (validMoves.length > 0) {
-              const snakeHead = newSnake[0];
-              const dx = food.x - snakeHead.x;
-              const dy = food.y - snakeHead.y;
-      
-              let bestMove = foodDirection;
-              if (Math.abs(dx) > Math.abs(dy)) {
-                bestMove = dx > 0 ? 'RIGHT' : 'LEFT';
-              } else {
-                bestMove = dy > 0 ? 'DOWN' : 'UP';
-              }
-              
-              if (validMoves.includes(bestMove)) {
-                foodDirection = bestMove;
-              } else if (!validMoves.includes(foodDirection)) {
-                foodDirection = validMoves[Math.floor(Math.random() * validMoves.length)];
-              }
-      
-              const newFood = { ...food };
-              switch (foodDirection) {
-                case 'UP': newFood.y = Math.max(0, newFood.y - 1); break;
-                case 'DOWN': newFood.y = Math.min(GRID_SIZE - 1, newFood.y + 1); break;
-                case 'LEFT': newFood.x = Math.max(0, newFood.x - 1); break;
-                case 'RIGHT': newFood.x = Math.min(GRID_SIZE - 1, newFood.x + 1); break;
-              }
-              food = newFood;
-            }
-        }
-        snake = newSnake;
-      }
-      return { ...prev, snake, food, foodDirection, score, level, speed, foodEatenThisLevel, status: newStatus };
-    });
-  }, [obstacles, playSound, settings, generateFood, getValidFoodMoves]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -313,7 +213,23 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     
     let lastUpdateRef = 0;
 
-    const draw = (state: GameState) => {
+    const getValidFoodMoves = (food: Point, snake: Point[]): Direction[] => {
+        const directions: Direction[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
+        return directions.filter(dir => {
+            let { x, y } = food;
+            if (dir === 'UP') y--; else if (dir === 'DOWN') y++;
+            else if (dir === 'LEFT') x--; else if (dir === 'RIGHT') x++;
+
+            const willHitWall = x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE;
+            const willHitSnake = snake.some(seg => seg.x === x && seg.y === y);
+            const willHitObstacle = obstacles.some(o => o.x === x && o.y === y);
+
+            return !willHitWall && !willHitSnake && !willHitObstacle;
+        });
+    };
+
+    const draw = () => {
+      const state = gameLogicState.current;
       const canvasSize = context.canvas.width;
       const cellSize = canvasSize / GRID_SIZE;
       
@@ -394,46 +310,106 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
       context.beginPath(); context.arc(eye2X, eye2Y, pupilRadius, 0, 2 * Math.PI); context.fill();
     };
 
+    const updateGame = () => {
+      const state = gameLogicState.current;
+      if (state.status !== 'RUNNING') return;
+
+      const head = { ...state.snake[0] };
+      switch (state.direction) {
+        case 'UP': head.y -= 1; break;
+        case 'DOWN': head.y += 1; break;
+        case 'LEFT': head.x -= 1; break;
+        case 'RIGHT': head.x += 1; break;
+      }
+
+      const headCollidesWithWall = head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE;
+      const headCollidesWithObstacle = obstacles.some(o => o.x === head.x && o.y === head.y);
+      const headCollidesWithSelf = state.snake.slice(1).some(segment => segment.x === head.x && segment.y === head.y);
+  
+      if (headCollidesWithWall || headCollidesWithObstacle || headCollidesWithSelf) {
+        gameOver();
+        return;
+      }
+
+      state.snake.unshift(head);
+
+      let scoreChanged = false;
+      if (head.x === state.food.x && head.y === state.food.y) {
+        playSound('eat');
+        scoreChanged = true;
+        state.food = generateFood(state.snake);
+      } else {
+        state.snake.pop();
+      }
+
+      if (settings.foodMoves) {
+        const validMoves = getValidFoodMoves(state.food, state.snake);
+        if (validMoves.length > 0) {
+          const snakeHead = state.snake[0];
+          const dx = state.food.x - snakeHead.x;
+          const dy = state.food.y - snakeHead.y;
+          let bestMove = state.foodDirection;
+          if (Math.abs(dx) > Math.abs(dy)) bestMove = dx > 0 ? 'RIGHT' : 'LEFT';
+          else bestMove = dy > 0 ? 'DOWN' : 'UP';
+          if (validMoves.includes(bestMove)) state.foodDirection = bestMove;
+          else if (!validMoves.includes(state.foodDirection)) state.foodDirection = validMoves[Math.floor(Math.random() * validMoves.length)];
+          const newFood = { ...state.food };
+          switch (state.foodDirection) {
+            case 'UP': newFood.y = Math.max(0, newFood.y - 1); break;
+            case 'DOWN': newFood.y = Math.min(GRID_SIZE - 1, newFood.y + 1); break;
+            case 'LEFT': newFood.x = Math.max(0, newFood.x - 1); break;
+            case 'RIGHT': newFood.x = Math.min(GRID_SIZE - 1, newFood.x + 1); break;
+          }
+          state.food = newFood;
+        }
+      }
+
+      if (scoreChanged) {
+        setDisplayState(prev => {
+          const newScore = prev.score + SCORE_INCREMENT;
+          const foodEatenThisLevel = (prev.score / SCORE_INCREMENT + 1) % settings.foodPerLevel;
+          let newLevel = prev.level;
+          
+          if (newLevel < settings.maxLevel && foodEatenThisLevel === 0) {
+            newLevel++;
+            gameLogicState.current.speed *= settings.speedIncrement;
+          }
+          return { ...prev, score: newScore, level: newLevel };
+        });
+      }
+    };
+    
+    const gameLoop = (time: number) => {
+        gameLoopRef.current = requestAnimationFrame(gameLoop);
+        if (gameLogicState.current.status !== 'RUNNING') {
+          draw(); // Keep drawing even when paused or game over
+          return;
+        };
+
+        const timeSinceLastUpdate = time - lastUpdateRef;
+        if (timeSinceLastUpdate > gameLogicState.current.speed) {
+          lastUpdateRef = time;
+          updateGame();
+        }
+        draw();
+    };
+
     const resizeCanvas = () => {
       const size = getCanvasSize();
       canvas.width = size;
       canvas.height = size;
-      draw(gameState);
+      draw();
     };
     
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
-
-    const gameLoop = (time: number) => {
-        if (gameState.status === 'RUNNING') {
-          const timeSinceLastUpdate = time - lastUpdateRef;
-          if (timeSinceLastUpdate > gameState.speed) {
-            lastUpdateRef = time;
-            updateGame();
-          }
-        }
-        draw(gameState);
-        gameLoopRef.current = requestAnimationFrame(gameLoop);
-    };
-
-    if (gameState.status === 'RUNNING') {
-        lastUpdateRef = performance.now();
-        if (!gameLoopRef.current) {
-          gameLoopRef.current = requestAnimationFrame(gameLoop);
-        }
-    }
-    
-    // Always draw the current state, even when paused or game over
-    draw(gameState);
+    gameLoopRef.current = requestAnimationFrame(gameLoop);
     
     return () => {
-      if (gameLoopRef.current) {
-        cancelAnimationFrame(gameLoopRef.current);
-        gameLoopRef.current = undefined;
-      }
+      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
       window.removeEventListener('resize', resizeCanvas);
     };
-  }, [gameState, getCanvasSize, gameOver, updateGame, obstacles, settings.hasObstacles]);
+  }, [getCanvasSize, gameOver, settings, playSound, generateFood, obstacles]);
 
   return (
     <Card className={cn(
@@ -442,8 +418,8 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     )}>
       <CardContent className="p-0">
         <div className={cn("flex justify-between items-center p-2 text-lg", isFullScreen && "hidden")}>
-          <div>Score: <span className="text-primary font-bold">{gameState.score}</span></div>
-          <div>Level: <span className="text-primary font-bold">{gameState.level}</span></div>
+          <div>Score: <span className="text-primary font-bold">{displayState.score}</span></div>
+          <div>Level: <span className="text-primary font-bold">{displayState.level}</span></div>
         </div>
         <div className="relative aspect-square w-full">
           <canvas
@@ -453,19 +429,19 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
             onTouchMove={handleTouchMove}
             onTouchEnd={() => touchStartRef.current = null}
           />
-          {(gameState.status !== 'RUNNING') && (
+          {(displayState.status !== 'RUNNING') && (
             <div 
               className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-center rounded-md p-4 cursor-pointer"
               onClick={handleOverlayClick}
             >
-                {gameState.status === 'IDLE' && (
+                {displayState.status === 'IDLE' && (
                     <>
                         <h2 className="text-4xl font-bold text-primary capitalize">{difficulty} Mode</h2>
                         <p className="mt-4 text-xl animate-flash">Tap or Press Enter to Start</p>
                         <div className="mt-8 text-muted-foreground grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
                             <div>
                                 <p className='font-bold text-primary'>Controls:</p>
-                                <p>Arrow Keys to Move</p>
+                                <p>Arrow Keys / WASD</p>
                                 <p>Spacebar to Pause</p>
                                 <p>'F' for Fullscreen</p>
                             </div>
@@ -477,11 +453,11 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
                         </div>
                     </>
                 )}
-                {gameState.status === 'PAUSED' && ( <> <h2 className="text-4xl font-bold">Paused</h2> <p className="mt-4 text-xl animate-flash">Tap to Resume</p> </> )}
-                {gameState.status === 'GAME_OVER' && (
+                {displayState.status === 'PAUSED' && ( <> <h2 className="text-4xl font-bold">Paused</h2> <p className="mt-4 text-xl animate-flash">Tap to Resume</p> </> )}
+                {displayState.status === 'GAME_OVER' && (
                     <>
                         <h2 className="text-4xl font-bold text-destructive">Game Over</h2>
-                        <p className="mt-2 text-2xl">Final Score: {gameState.score}</p>
+                        <p className="mt-2 text-2xl">Final Score: {displayState.score}</p>
                         <div className="flex gap-4 mt-6">
                             <Button onClick={startGame}>Restart</Button>
                             <Button variant="outline" onClick={onExit}><ArrowLeft className="mr-2 h-4 w-4" />Back</Button>
@@ -496,10 +472,10 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
             </Button>
           </div>
 
-          { (gameState.status === 'RUNNING' || gameState.status === 'PAUSED') &&
+          { (displayState.status === 'RUNNING' || displayState.status === 'PAUSED') &&
             <div className='absolute bottom-1 right-1 z-20 lg:hidden'>
               <Button variant="ghost" size="icon" className="text-white/50 hover:text-white hover:bg-white/10" onClick={(e) => { e.stopPropagation(); togglePause(); }}>
-                  {gameState.status === 'PAUSED' ? <Play size={20} /> : <Pause size={20} />}
+                  {displayState.status === 'PAUSED' ? <Play size={20} /> : <Pause size={20} />}
               </Button>
             </div>
           }

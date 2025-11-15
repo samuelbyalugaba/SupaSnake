@@ -10,8 +10,5 @@ export type GameState = {
   foodDirection: Direction;
   direction: Direction;
   speed: number;
-  score: number;
-  level: number;
-  foodEatenThisLevel: number;
   status: GameStatus;
 };
