@@ -13,7 +13,7 @@ import { INITIAL_SNAKE_POSITION } from '@/lib/constants';
 
 const DIFFICULTY_SETTINGS = {
   easy: { speed: 200, foodMoves: false, hasObstacles: false, speedIncrement: 0.95, foodPerLevel: 5, maxLevel: 5 },
-  medium: { speed: 120, foodMoves: true, hasObstacles: false, speedIncrement: 0.9, foodPerLevel: 5, maxLevel: 10 },
+  medium: { speed: 150, foodMoves: true, hasObstacles: false, speedIncrement: 0.9, foodPerLevel: 5, maxLevel: 10 },
   hard: { speed: 85, foodMoves: true, hasObstacles: true, speedIncrement: 0.9, foodPerLevel: 5, maxLevel: 15 },
 };
 const OBSTACLE_COUNT = 5;
@@ -29,7 +29,7 @@ interface SnakeGameProps {
 
 const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, difficulty, onExit }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gameLoopRef = useRef<NodeJS.Timeout>();
+  const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartRef = useRef<Point | null>(null);
 
   const { playSound } = useSounds();
@@ -76,7 +76,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
       foodDirection: 'RIGHT' as Direction,
       speed: settings.speed,
     };
-  }, [generateFood, settings.speed, obstacles]);
+  }, [generateFood, settings.speed]);
 
   const gameLogicState = useRef(createInitialState());
   const [displayState, setDisplayState] = useState({
@@ -103,9 +103,9 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
       context.shadowColor = '#222';
       context.shadowBlur = 10;
       obstacles.forEach(o => context.fillRect(o.x * cellSize, o.y * cellSize, cellSize, cellSize));
+      context.shadowColor = 'transparent';
+      context.shadowBlur = 0;
     }
-    context.shadowBlur = 0;
-    context.shadowColor = 'transparent';
 
     const food = state.food;
     const centerX = food.x * cellSize + cellSize / 2;
@@ -143,8 +143,8 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
         context.shadowBlur = 8;
         context.beginPath(); context.arc(segCenterX, segCenterY, radius, 0, 2 * Math.PI); context.fill();
     }
-    context.shadowBlur = 0;
     context.shadowColor = 'transparent';
+    context.shadowBlur = 0;
 
     const head = snake[0];
     const headCenterX = head.x * cellSize + cellSize / 2;
@@ -157,8 +157,8 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     context.shadowColor = 'rgba(57, 255, 20, 0.7)';
     context.shadowBlur = 15;
     context.beginPath(); context.arc(headCenterX, headCenterY, headRadius, 0, 2 * Math.PI); context.fill();
-    context.shadowBlur = 0;
     context.shadowColor = 'transparent';
+    context.shadowBlur = 0;
 
     context.fillStyle = 'white';
     const eyeRadius = cellSize * 0.1;
@@ -275,7 +275,6 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
       status: 'RUNNING',
     });
   }, [createInitialState]);
-  
 
   useEffect(() => {
     draw();
@@ -414,7 +413,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
         <div className="relative aspect-square w-full">
           <canvas
             ref={canvasRef}
-            className="w-full h-full object-contain rounded-md touch-none"
+            className="w-full h-full object-contain rounded-md touch-none border-2 border-primary/30"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={() => touchStartRef.current = null}
@@ -464,7 +463,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
 
           { (displayState.status === 'RUNNING' || displayState.status === 'PAUSED') &&
             <div className='absolute bottom-1 right-1 z-20 lg:hidden'>
-              <Button variant="ghost" size="icon" className="text-white/50 hover:text-white hover:bg-white/10" onClick={(e) => { estopPropagation(); togglePause(); }}>
+              <Button variant="ghost" size="icon" className="text-white/50 hover:text-white hover:bg-white/10" onClick={(e) => { e.stopPropagation(); togglePause(); }}>
                   {displayState.status === 'PAUSED' ? <Play size={20} /> : <Pause size={20} />}
               </Button>
             </div>
@@ -476,3 +475,5 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
 };
 
 export default SnakeGame;
+
+    
