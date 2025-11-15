@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Maximize, Minimize, Pause, Play, ArrowLeft } from 'lucide-react';
@@ -88,6 +88,16 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     playSound('gameOver');
     setDisplayState(prev => ({ ...prev, status: 'GAME_OVER' }));
   }, [playSound]);
+
+  const restartGame = useCallback(() => {
+    gameLogicState.current = createInitialState();
+    setDisplayState({
+      score: 0,
+      level: 1,
+      status: 'RUNNING',
+    });
+  }, [createInitialState]);
+
 
   const updateGame = useCallback(() => {
     const state = gameLogicState.current;
@@ -248,8 +258,8 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
   }, [settings.hasObstacles, obstacles]);
   
   useEffect(() => {
-    draw(); // Draw initial state
-  }, [draw]);
+    draw();
+  }, [draw, displayState]);
 
   useEffect(() => {
     if (displayState.status === 'RUNNING') {
@@ -278,11 +288,6 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
   const pauseGame = useCallback(() => {
     setDisplayState(prev => ({ ...prev, status: 'PAUSED' }));
   }, []);
-
-  const restartGame = useCallback(() => {
-    gameLogicState.current = createInitialState();
-    setDisplayState({ score: 0, level: 1, status: 'RUNNING' });
-  }, [createInitialState]);
 
   const togglePause = useCallback(() => {
     if (displayState.status === 'RUNNING') pauseGame();
@@ -435,8 +440,8 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
                         <h2 className="text-4xl font-bold text-destructive">Game Over</h2>
                         <p className="mt-2 text-2xl">Final Score: {displayState.score}</p>
                         <div className="flex gap-4 mt-6">
-                            <Button onClick={restartGame}>Restart</Button>
-                            <Button variant="outline" onClick={onExit}><ArrowLeft className="mr-2 h-4 w-4" />Back</Button>
+                            <Button onClick={(e) => { e.stopPropagation(); restartGame(); }}>Restart</Button>
+                            <Button variant="outline" onClick={(e) => { e.stopPropagation(); onExit();}}><ArrowLeft className="mr-2 h-4 w-4" />Back</Button>
                         </div>
                     </>
                 )}
@@ -462,3 +467,5 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
 };
 
 export default SnakeGame;
+
+    
