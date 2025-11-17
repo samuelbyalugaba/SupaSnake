@@ -155,6 +155,9 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     if (gameOverTriggered.current) return;
     gameOverTriggered.current = true;
     
+    // Give auth state a moment to settle before writing.
+    await new Promise(resolve => setTimeout(resolve, 50));
+
     vibrate(200);
     playSound('gameOver');
     
@@ -165,14 +168,14 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     updateAchievementProgress('snake-architect', survivalTime);
     updateAchievementProgress('marathon-runner', survivalTime);
     
-    if (deathReason === 'wall') updateAchievementProgress('first-death-by-wall', 1);
-    if (deathReason === 'self') updateAchievementProgress('first-death-by-self', 1);
-    if (deathReason === 'obstacle') updateAchievementProgress('first-death-by-obstacle', 1);
+    if (deathReason === 'wall') updateAchievementProgress('first-death-by-wall', 1, true);
+    if (deathReason === 'self') updateAchievementProgress('first-death-by-self', 1, true);
+    if (deathReason === 'obstacle') updateAchievementProgress('first-death-by-obstacle', 1, true);
 
     // Update stats and sync all pending achievements
     if (user) {
         const achievementsToSync = getAchievementsToSync();
-        updateStatsAndAchievements({ 
+        await updateStatsAndAchievements({ 
             score: displayState.score, 
             foodEaten: foodEatenThisGameRef.current,
             achievementsToSync
@@ -369,7 +372,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
       if (foodSpawnTimeRef.current) {
         const timeToEat = (Date.now() - foodSpawnTimeRef.current) / 1000;
         if (timeToEat <= 2 && (difficulty === 'medium' || difficulty === 'hard')) {
-            updateAchievementProgress('clean-sweep', 1);
+            updateAchievementProgress('clean-sweep', 1, true);
         }
       }
       
@@ -404,17 +407,17 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     const isOneTileGap = (p1: Point, p2: Point) => Math.abs(p1.x - p2.x) + Math.abs(p1.y - p2.y) === 2;
     for(let i = 2; i < state.snake.length; i++) {
         if(isOneTileGap(head, state.snake[i])) {
-            updateAchievementProgress('serpent-surgeon', 1);
+            updateAchievementProgress('serpent-surgeon', 1, true);
             break;
         }
     }
     
     if (ateFood) {
         foodEatenThisGameRef.current += 1;
-        updateAchievementProgress('first-bite', 1);
-        updateAchievementProgress('eat-50', 1);
-        updateAchievementProgress('eat-250', 1);
-        updateAchievementProgress('eat-1000', 1);
+        updateAchievementProgress('first-bite', 1, true);
+        updateAchievementProgress('eat-50', 1, true);
+        updateAchievementProgress('eat-250', 1, true);
+        updateAchievementProgress('eat-1000', 1, true);
 
         setDisplayState(prev => {
             const oldScore = prev.score;
@@ -517,19 +520,19 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     setDisplayState(prev => ({ ...prev, status: 'RUNNING' }));
     
     // These are cumulative, so we add 1 each time. The context will handle summing them.
-    updateAchievementProgress('first-game', 1);
-    updateAchievementProgress('play-10', 1);
-    updateAchievementProgress('play-50', 1);
-    updateAchievementProgress('play-100', 1);
-    updateAchievementProgress('play-250', 1);
-    updateAchievementProgress('play-500', 1);
+    updateAchievementProgress('first-game', 1, true);
+    updateAchievementProgress('play-10', 1, true);
+    updateAchievementProgress('play-50', 1, true);
+    updateAchievementProgress('play-100', 1, true);
+    updateAchievementProgress('play-250', 1, true);
+    updateAchievementProgress('play-500', 1, true);
 
     const now = new Date();
     if (now.getHours() >= 0 && now.getHours() < 3) {
-      updateAchievementProgress('play-at-midnight', 1);
+      updateAchievementProgress('play-at-midnight', 1, true);
     }
     if (now.getDay() === 0 || now.getDay() === 6) {
-      updateAchievementProgress('play-on-weekend', 1);
+      updateAchievementProgress('play-on-weekend', 1, true);
     }
   }, [updateAchievementProgress, clearAchievementsToSync]);
 
@@ -606,7 +609,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
   const handleToggleFullScreen = () => {
     toggleFullScreen();
     if (!isFullScreen) {
-        updateAchievementProgress('full-screen', 1);
+        updateAchievementProgress('full-screen', 1, true);
     }
   }
 

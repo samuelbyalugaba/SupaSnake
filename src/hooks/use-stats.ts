@@ -21,7 +21,6 @@ export const useStats = () => {
     
     const updateStatsAndAchievements = useCallback(async ({ score, foodEaten, achievementsToSync }: { score: number; foodEaten: number; achievementsToSync: Map<string, { value: number; type: 'max' | 'cumulative' }>}) => {
         if (!user) {
-            console.error("Attempted to update stats for a null user.");
             clearAchievementsToSync();
             return;
         };
