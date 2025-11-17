@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef, useMemo } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { collection, doc, writeBatch, serverTimestamp, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, doc, writeBatch, serverTimestamp, getDocs, Timestamp, increment } from 'firebase/firestore';
 import { ALL_ACHIEVEMENTS } from '@/lib/achievements';
 import type { UserAchievement, AchievementWithProgress } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -11,10 +11,10 @@ import { Trophy } from 'lucide-react';
 
 interface AchievementContextType {
   achievements: AchievementWithProgress[];
-  updateAchievementProgress: (id: string, value: number) => void;
-  getAchievementsToSync: () => Map<string, number>;
+  updateAchievementProgress: (id: string, value: number, additive?: boolean) => void;
+  getAchievementsToSync: () => Map<string, { value: number; type: 'max' | 'cumulative' }>;
   clearAchievementsToSync: () => void;
-  syncAchievements: (batch: ReturnType<typeof writeBatch>, achievementsToSync: Map<string, number>) => Promise<void>;
+  syncAchievements: (batch: ReturnType<typeof writeBatch>, achievementsToSync: Map<string, { value: number; type: 'max' | 'cumulative' }>) => Promise<void>;
   resetAchievements: () => Promise<void>;
   isLoading: boolean;
   refetchAchievements: () => void;
@@ -34,12 +34,12 @@ export const AchievementProvider = ({ children }: { children: ReactNode }) => {
   
   const [userAchievements, setUserAchievements] = useState<UserAchievement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const achievementsToSync = useRef<Map<string, number>>(new Map());
+  const achievementsToSync = useRef<Map<string, { value: number; type: 'max' | 'cumulative' }>>(new Map());
 
   const refetchAchievements = useCallback(() => {
     if (!userAchievementsRef) return;
     getDocs(userAchievementsRef).then(snapshot => {
-      const data = snapshot.docs.map(doc => doc.data() as UserAchievement);
+      const data = snapshot.docs.map(doc => ({...doc.data(), id: doc.id} as UserAchievement));
       setUserAchievements(data);
     });
   }, [userAchievementsRef]);
@@ -53,7 +53,7 @@ export const AchievementProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsLoading(true);
     getDocs(userAchievementsRef).then(snapshot => {
-      const data = snapshot.docs.map(doc => doc.data() as UserAchievement);
+      const data = snapshot.docs.map(doc => ({...doc.data(), id: doc.id} as UserAchievement));
       setUserAchievements(data);
     }).finally(() => setIsLoading(false));
   }, [userAchievementsRef]);
@@ -77,11 +77,18 @@ export const AchievementProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const currentProgress = achievementsToSync.current.get(id) || achievement.progress;
-    const newProgress = Math.max(currentProgress, value);
+    const existingProgress = achievementsToSync.current.get(id);
+    let newProgressValue;
 
-    if (newProgress > currentProgress) {
-        achievementsToSync.current.set(id, newProgress);
+    if (achievement.type === 'cumulative') {
+        newProgressValue = (existingProgress?.value || 0) + value;
+    } else { // 'max'
+        newProgressValue = Math.max(existingProgress?.value || 0, value);
+    }
+    
+    // Only update if there's a change to sync
+    if (newProgressValue !== existingProgress?.value) {
+       achievementsToSync.current.set(id, { value: newProgressValue, type: achievement.type });
     }
   }, [combinedAchievements]);
 
@@ -93,34 +100,43 @@ export const AchievementProvider = ({ children }: { children: ReactNode }) => {
     achievementsToSync.current.clear();
   }, []);
 
-  const syncAchievements = useCallback(async (batch: ReturnType<typeof writeBatch>, achievementsToSyncMap: Map<string, number>) => {
+  const syncAchievements = useCallback(async (batch: ReturnType<typeof writeBatch>, achievementsToSyncMap: Map<string, { value: number; type: 'max' | 'cumulative' }>) => {
     if (!user || !db || achievementsToSyncMap.size === 0) return;
 
     const achievementsToUnlock: AchievementWithProgress[] = [];
     
-    for (const [id, progress] of achievementsToSyncMap.entries()) {
+    for (const [id, syncData] of achievementsToSyncMap.entries()) {
       const achievement = combinedAchievements.find(a => a.id === id);
       if (!achievement || achievement.isUnlocked) continue;
 
       const docRef = doc(db, `users/${user.uid}/achievements`, id);
+      const currentProgress = achievement.progress || 0;
+      let finalProgress;
+      let updatePayload: any;
 
-      if (progress >= achievement.target) {
-        batch.set(docRef, { 
-            id, 
-            isUnlocked: true, 
-            progress, 
-            unlockedAt: serverTimestamp() 
-        }, { merge: true });
-        achievementsToUnlock.push(achievement);
-      } else {
-        batch.set(docRef, { id, progress, isUnlocked: false }, { merge: true });
+      if (syncData.type === 'cumulative') {
+        finalProgress = currentProgress + syncData.value;
+        updatePayload = { id, progress: increment(syncData.value) };
+      } else { // 'max'
+        finalProgress = Math.max(currentProgress, syncData.value);
+        if (finalProgress > currentProgress) {
+            updatePayload = { id, progress: finalProgress };
+        }
       }
+      
+      if (!updatePayload) continue;
+
+      if (finalProgress >= achievement.target) {
+        updatePayload.isUnlocked = true;
+        updatePayload.unlockedAt = serverTimestamp();
+        achievementsToUnlock.push({ ...achievement, progress: finalProgress, isUnlocked: true });
+      } else {
+        updatePayload.isUnlocked = false;
+      }
+      
+      batch.set(docRef, updatePayload, { merge: true });
     }
 
-    // The commit is handled by the calling transaction function
-    
-    // This part is tricky because we can't await the toast inside the transaction
-    // We'll show toasts after the transaction successfully completes.
     setTimeout(() => {
         achievementsToUnlock.forEach(achievement => {
             toast({
@@ -133,7 +149,7 @@ export const AchievementProvider = ({ children }: { children: ReactNode }) => {
                 description: achievement.name,
             });
         });
-    }, 0);
+    }, 500); // Delay to allow firestore propagation
 
   }, [user, db, toast, combinedAchievements]);
 
@@ -151,7 +167,6 @@ export const AchievementProvider = ({ children }: { children: ReactNode }) => {
     
     await batch.commit();
     
-    // Update local state immediately
     setUserAchievements([]);
     clearAchievementsToSync();
 

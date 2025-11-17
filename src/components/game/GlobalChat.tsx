@@ -159,14 +159,14 @@ const GlobalChat: React.FC = () => {
                          <ChatMessages messages={nestMessages} isLoading={isNestLoading}/>
                     </TabsContent>
                      <TabsContent value="dms" className="h-full flex items-center justify-center text-muted-foreground mt-0">
-                        <p>Private messages coming soon! Click on a user in chat to start a conversation.</p>
+                        <p>Private messages coming soon!</p>
                     </TabsContent>
                 </div>
                 <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                     <Input
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        placeholder={activeTab === 'nest' && !nestId ? 'Join a Nest to chat here' : 'Say something...'}
+                        placeholder={activeTab === 'dms' ? 'DMs are not yet available' : activeTab === 'nest' && !nestId ? 'Join a Nest to chat here' : 'Say something...'}
                         disabled={isSending || isLoading || (activeTab === 'nest' && !nestId) || activeTab === 'dms'}
                         autoComplete="off"
                     />

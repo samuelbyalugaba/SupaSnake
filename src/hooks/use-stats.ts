@@ -3,14 +3,14 @@
 
 import { useMemo, useCallback } from 'react';
 import { useUser, useFirestore, useDoc } from '@/firebase';
-import { doc, writeBatch, increment, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, writeBatch, increment, setDoc, getDoc as getFirestoreDoc } from 'firebase/firestore';
 import type { UserStats } from '@/lib/types';
 import { useAchievements } from '@/context/AchievementContext';
 
 export const useStats = () => {
     const { user } = useUser();
     const db = useFirestore();
-    const { syncAchievements, clearAchievementsToSync, refetchAchievements } = useAchievements();
+    const { syncAchievements, clearAchievementsToSync, refetchAchievements, achievements } = useAchievements();
 
     const statsRef = useMemo(
         () => (user ? doc(db, `users/${user.uid}/stats/summary`) : null),
@@ -19,19 +19,32 @@ export const useStats = () => {
 
     const { data: stats, isLoading } = useDoc<UserStats>(statsRef);
     
-    const updateStatsAndAchievements = useCallback(async ({ score, achievementsToSync }: { score: number; foodEaten: number; achievementsToSync: Map<string, number>}) => {
+    const updateStatsAndAchievements = useCallback(async ({ score, achievementsToSync }: { score: number; foodEaten: number; achievementsToSync: Map<string, { value: number; type: 'max' | 'cumulative' }>}) => {
         if (!statsRef || !user) return;
         
         try {
             const batch = writeBatch(db);
             const bitsEarned = Math.floor(score / 5);
-            // Award league points based on score
             const leaguePointsGained = Math.floor(score / 10);
+            const userStats = stats || { highScore: 0, gamesPlayed: 0, totalScore: 0, neonBits: 0, leaguePoints: 0 };
+
+            // Add cumulative game stats to the sync map
+            achievementsToSync.set('play-10', { value: 1, type: 'cumulative' });
+            achievementsToSync.set('play-50', { value: 1, type: 'cumulative' });
+            achievementsToSync.set('play-100', { value: 1, type: 'cumulative' });
+            achievementsToSync.set('play-250', { value: 1, type: 'cumulative' });
+            achievementsToSync.set('play-500', { value: 1, type: 'cumulative' });
+            achievementsToSync.set('first-game', { value: 1, type: 'cumulative' });
+            
+            const deathCountAchievement = achievements.find(a => a.id === 'ten-deaths');
+            if (deathCountAchievement && !deathCountAchievement.isUnlocked) {
+                 achievementsToSync.set('ten-deaths', { value: 1, type: 'cumulative' });
+                 achievementsToSync.set('hundred-deaths', { value: 1, type: 'cumulative' });
+            }
 
             // Use set with merge:true to create the document if it doesn't exist, or update it if it does.
-            // This prevents the "No document to update" error for new users.
             batch.set(statsRef, {
-                highScore: Math.max(score, stats?.highScore ?? 0),
+                highScore: Math.max(score, userStats.highScore),
                 gamesPlayed: increment(1),
                 totalScore: increment(score),
                 neonBits: increment(bitsEarned),
@@ -51,34 +64,24 @@ export const useStats = () => {
             
             await batch.commit();
             
-            // Clear pending achievements and refetch data for UI update.
             clearAchievementsToSync();
             refetchAchievements();
 
         } catch (error) {
             console.error("Error updating stats and achievements:", error);
-            // If the transaction fails, especially on the public doc, we might need a recovery mechanism
-            // For now, we just log the error.
              if (error instanceof Error && error.message.includes("No document to update")) {
-                // This can happen if the league-players doc doesn't exist yet for some reason.
-                // Let's try to create it.
                 const leaguePlayerRef = doc(db, `league-players/${user.uid}`);
-                const userStats = (await getDoc(statsRef)).data();
+                const userStatsDoc = (await getFirestoreDoc(statsRef));
+                const currentStats = userStatsDoc.data();
                 await setDoc(leaguePlayerRef, {
                     userId: user.uid,
                     username: user.displayName,
-                    leaguePoints: userStats?.leaguePoints ?? 0,
-                    equippedCosmetic: userStats?.equippedCosmetic ?? 'default'
+                    leaguePoints: currentStats?.leaguePoints ?? 0,
+                    equippedCosmetic: currentStats?.equippedCosmetic ?? 'default'
                 });
              }
         }
-    }, [statsRef, user, db, syncAchievements, clearAchievementsToSync, refetchAchievements, stats?.highScore]);
-    
-    const getDoc = async (ref: any) => {
-        const doc = await ref.get();
-        return doc;
-    }
-
+    }, [statsRef, user, db, syncAchievements, clearAchievementsToSync, refetchAchievements, stats, achievements]);
 
     return { stats, isLoading, updateStatsAndAchievements };
 };

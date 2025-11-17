@@ -25,6 +25,7 @@ export type Message = {
 }
 
 export type AchievementCategory = 'Core' | 'Grind' | 'Score' | 'Length' | 'Difficulty' | 'Skill' | 'Endurance' | 'Meta' | 'Ultimate';
+export type AchievementType = 'max' | 'cumulative';
 
 export type Achievement = {
   id: string;
@@ -34,6 +35,7 @@ export type Achievement = {
   category: AchievementCategory;
   isSecret?: boolean;
   target: number; // The value needed to unlock the achievement
+  type: AchievementType; // How progress is tracked
 };
 
 export type UserAchievement = {
@@ -53,6 +55,7 @@ export type UserStats = {
     neonBits: number;
     equippedCosmetic: string;
     nestId: string | null;
+    leaguePoints: number;
 };
 
 export type CosmeticRarity = 'Common' | 'Rare' | 'Epic' | 'Legendary' | 'Seasonal';

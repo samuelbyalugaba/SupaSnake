@@ -151,33 +151,25 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     }
   };
 
-  const handleGameOver = useCallback(async () => {
+  const handleGameOver = useCallback(async (deathReason: 'wall' | 'self' | 'obstacle') => {
     if (gameOverTriggered.current) return;
     gameOverTriggered.current = true;
     
     vibrate(200);
     playSound('gameOver');
     
-    // Check for achievement-based cosmetic unlocks
-    const unlockedAchievements = achievements.filter(ach => ach.isUnlocked);
-    for (const cosmetic of ALL_COSMETICS) {
-        if (cosmetic.achievementId && unlockedAchievements.some(ach => ach.id === cosmetic.achievementId)) {
-            await unlockCosmetic(cosmetic.id);
-        }
-    }
-
     setDisplayState(prev => ({ ...prev, status: 'GAME_OVER' }));
-
+    
+    // Pass single-run stats to be processed
     const survivalTime = (Date.now() - (gameStartTimeRef.current ?? Date.now())) / 1000;
     updateAchievementProgress('snake-architect', survivalTime);
     updateAchievementProgress('marathon-runner', survivalTime);
-
-    // Game Over Achievements
-    updateAchievementProgress('first-game', 1);
-    updateAchievementProgress('ten-deaths', 1);
-    updateAchievementProgress('hundred-deaths', 1);
     
-    // Update stats and sync achievements in a single transaction if user is logged in
+    if (deathReason === 'wall') updateAchievementProgress('first-death-by-wall', 1);
+    if (deathReason === 'self') updateAchievementProgress('first-death-by-self', 1);
+    if (deathReason === 'obstacle') updateAchievementProgress('first-death-by-obstacle', 1);
+
+    // Update stats and sync all pending achievements
     if (user) {
         const achievementsToSync = getAchievementsToSync();
         updateStatsAndAchievements({ 
@@ -187,7 +179,15 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
         });
     }
 
-  }, [playSound, updateAchievementProgress, user, updateStatsAndAchievements, getAchievementsToSync, displayState.score, achievements, unlockCosmetic]);
+    // Check for achievement-based cosmetic unlocks after stats have been synced
+    const unlockedAchievements = achievements.filter(ach => ach.isUnlocked);
+    for (const cosmetic of ALL_COSMETICS) {
+        if (cosmetic.achievementId && unlockedAchievements.some(ach => ach.id === cosmetic.achievementId)) {
+            await unlockCosmetic(cosmetic.id);
+        }
+    }
+
+  }, [playSound, updateAchievementProgress, user, updateStatsAndAchievements, getAchievementsToSync, displayState.score, achievements, unlockCosmetic, gameStartTimeRef]);
 
 
   const draw = useCallback(() => {
@@ -336,26 +336,23 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
 
     switch (state.direction) {
       case 'UP': head.y -= 1; break;
-      case 'DOWN': head.y += 1; break;
+      case 'DOWN': head.y -= -1; break;
       case 'LEFT': head.x -= 1; break;
-      case 'RIGHT': head.x += 1; break;
+      case 'RIGHT': head.x -= -1; break;
     }
 
     if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
       noWallHitTimeRef.current = null; // Reset on wall hit
-      updateAchievementProgress('first-death-by-wall', 1);
-      handleGameOver();
+      handleGameOver('wall');
       return;
     }
     if (obstacles.some(o => o.x === head.x && o.y === head.y)) {
-      updateAchievementProgress('first-death-by-obstacle', 1);
-      handleGameOver();
+      handleGameOver('obstacle');
       return;
     }
     for (let i = 1; i < state.snake.length; i++) {
         if (state.snake[i].x === head.x && state.snake[i].y === head.y) {
-            updateAchievementProgress('first-death-by-self', 1);
-            handleGameOver();
+            handleGameOver('self');
             return;
         }
     }
@@ -371,21 +368,19 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
       // Handle timing-based achievements
       if (foodSpawnTimeRef.current) {
         const timeToEat = (Date.now() - foodSpawnTimeRef.current) / 1000;
-        if (timeToEat <= 2) {
+        if (timeToEat <= 2 && (difficulty === 'medium' || difficulty === 'hard')) {
             updateAchievementProgress('clean-sweep', 1);
         }
       }
       
       const now = Date.now();
-      if (lastFoodTimeRef.current && now - lastFoodTimeRef.current < 10000) {
+      if (lastFoodTimeRef.current && now - lastFoodTimeRef.current < 3000) { // rat-trick is 3 in 3 sec
         fastFoodCounterRef.current += 1;
       } else {
         fastFoodCounterRef.current = 1;
       }
       lastFoodTimeRef.current = now;
-      if (fastFoodCounterRef.current >= 3) {
-        updateAchievementProgress('master-of-momentum', fastFoodCounterRef.current);
-      }
+      updateAchievementProgress('rat-trick', fastFoodCounterRef.current);
 
       state.food = generateFood(state.snake);
     } else {
@@ -399,18 +394,11 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     updateAchievementProgress('very-long-snake', snakeLength);
     updateAchievementProgress('mega-snake', snakeLength);
     updateAchievementProgress('ultra-snake', snakeLength);
-
-    if(displayState.score === 10 && noRightTurnRef.current) {
-      updateAchievementProgress('ultra-instinct', 10);
-    }
-
-    if(displayState.score === 50 && noLeftTurnRef.current) {
-        updateAchievementProgress('no-left-turn', 50);
-    }
-
-    if (displayState.score === 50 && noDownTurnRef.current) {
-        updateAchievementProgress('no-down-turn', 50);
-    }
+    
+    const currentScore = displayState.score;
+    if (noRightTurnRef.current) updateAchievementProgress('ultra-instinct', currentScore);
+    if (noLeftTurnRef.current) updateAchievementProgress('no-left-turn', currentScore);
+    if (noDownTurnRef.current) updateAchievementProgress('no-down-turn', currentScore);
 
     // Check for "Serpent Surgeon"
     const isOneTileGap = (p1: Point, p2: Point) => Math.abs(p1.x - p2.x) + Math.abs(p1.y - p2.y) === 2;
@@ -427,7 +415,6 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
         updateAchievementProgress('eat-50', 1);
         updateAchievementProgress('eat-250', 1);
         updateAchievementProgress('eat-1000', 1);
-        updateAchievementProgress('rat-trick', fastFoodCounterRef.current);
 
         setDisplayState(prev => {
             const oldScore = prev.score;
@@ -442,6 +429,8 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
             if (newSpeedMilestone > oldSpeedMilestone) {
                 gameLogicState.current.speed *= settings.speedIncrement;
                 updateAchievementProgress('sweaty-gamer-mode', newSpeedMilestone);
+                updateAchievementProgress('speed-tier-3', newSpeedMilestone);
+                updateAchievementProgress('speed-tier-4', newSpeedMilestone);
                 speedMultiplier = parseFloat((prev.speedMultiplier + 0.1).toFixed(1));
             }
             
@@ -525,11 +514,8 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     lastFoodMoveTime.current = performance.now();
 
     setDisplayState(prev => ({ ...prev, status: 'RUNNING' }));
-    updateAchievementProgress('play-10', 1);
-    updateAchievementProgress('play-50', 1);
-    updateAchievementProgress('play-100', 1);
-    updateAchievementProgress('play-250', 1);
-    updateAchievementProgress('play-500', 1);
+    
+    // These are cumulative, so we add 1 each time. The context will handle summing them.
     updateAchievementProgress('play-on-weekend', 1);
 
     const now = new Date();

@@ -34,7 +34,7 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const [isSubmittingUsername, setIsSubmittingUsername] = useState(false);
   const { isMuted, toggleMute, theme, setTheme } = useSettings();
-  const { resetAchievements, updateAchievementProgress } = useAchievements();
+  const { resetAchievements, updateAchievementProgress, getAchievementsToSync, syncAchievements } = useAchievements();
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -53,9 +53,8 @@ export default function SettingsPage() {
         title: "Success",
         description: "Your username has been updated.",
       });
-      // Logic for the 'change-username' achievement
+      // This is a direct, immediate action, so we can track it this way
       updateAchievementProgress('change-username', 1);
-      // Reset form with new values to make it pristine
       form.reset({ username: data.username });
     } catch (error: any) {
       toast({
@@ -166,8 +165,11 @@ export default function SettingsPage() {
            <div className="space-y-2">
             <Label>Theme</Label>
             <Select value={theme} onValueChange={(newTheme) => {
-                setTheme(newTheme as 'neon' | 'light' | 'dark');
-                updateAchievementProgress('theme-switcher', 1);
+                const themeValue = newTheme as 'neon' | 'light' | 'dark';
+                setTheme(themeValue);
+                if(themeValue !== theme) {
+                    updateAchievementProgress('theme-switcher', 1);
+                }
             }}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a theme" />
