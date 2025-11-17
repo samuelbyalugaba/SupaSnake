@@ -29,12 +29,12 @@ export const useStats = () => {
             const userStats = stats || { highScore: 0, gamesPlayed: 0, totalScore: 0, neonBits: 0, leaguePoints: 0 };
 
             // Add cumulative game stats to the sync map
+            achievementsToSync.set('first-game', { value: 1, type: 'cumulative' });
             achievementsToSync.set('play-10', { value: 1, type: 'cumulative' });
             achievementsToSync.set('play-50', { value: 1, type: 'cumulative' });
             achievementsToSync.set('play-100', { value: 1, type: 'cumulative' });
             achievementsToSync.set('play-250', { value: 1, type: 'cumulative' });
             achievementsToSync.set('play-500', { value: 1, type: 'cumulative' });
-            achievementsToSync.set('first-game', { value: 1, type: 'cumulative' });
             
             const deathCountAchievement = achievements.find(a => a.id === 'ten-deaths');
             if (deathCountAchievement && !deathCountAchievement.isUnlocked) {

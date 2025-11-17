@@ -2,17 +2,17 @@
 'use client';
 
 import React, { createContext, useContext, ReactNode } from 'react';
-import { useCosmetics as useCosmeticsHook } from '@/hooks/use-cosmetics';
+import { useCosmetics as useCosmeticsData } from '@/hooks/use-cosmetics';
 
 // Extract the return type of the hook
-type CosmeticsHookType = ReturnType<typeof useCosmeticsHook>;
+type CosmeticsHookType = ReturnType<typeof useCosmeticsData>;
 
 // Create the context with a default undefined value
 const CosmeticsContext = createContext<CosmeticsHookType | undefined>(undefined);
 
 // Provider component
 export const CosmeticsProvider = ({ children }: { children: ReactNode }) => {
-  const cosmetics = useCosmeticsHook();
+  const cosmetics = useCosmeticsData();
   return <CosmeticsContext.Provider value={cosmetics}>{children}</CosmeticsContext.Provider>;
 };
 

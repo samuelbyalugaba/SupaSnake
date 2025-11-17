@@ -43,7 +43,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
   
   const { user } = useUser();
   const { updateStatsAndAchievements } = useStats();
-  const { updateAchievementProgress, getAchievementsToSync, achievements } = useAchievements();
+  const { updateAchievementProgress, getAchievementsToSync, achievements, clearAchievementsToSync } = useAchievements();
   const { equippedCosmetic, unlockCosmetic } = useCosmetics();
   const { playSound } = useSounds();
   const settings = DIFFICULTY_SETTINGS[difficulty];
@@ -187,7 +187,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
         }
     }
 
-  }, [playSound, updateAchievementProgress, user, updateStatsAndAchievements, getAchievementsToSync, displayState.score, achievements, unlockCosmetic, gameStartTimeRef]);
+  }, [playSound, updateAchievementProgress, user, updateStatsAndAchievements, getAchievementsToSync, displayState.score, achievements, unlockCosmetic]);
 
 
   const draw = useCallback(() => {
@@ -498,6 +498,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
 
 
   const startGame = useCallback(() => {
+    clearAchievementsToSync();
     // Reset achievement states for a new game
     gameStartTimeRef.current = Date.now();
     noWallHitTimeRef.current = Date.now();
@@ -516,14 +517,21 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     setDisplayState(prev => ({ ...prev, status: 'RUNNING' }));
     
     // These are cumulative, so we add 1 each time. The context will handle summing them.
-    updateAchievementProgress('play-on-weekend', 1);
+    updateAchievementProgress('first-game', 1);
+    updateAchievementProgress('play-10', 1);
+    updateAchievementProgress('play-50', 1);
+    updateAchievementProgress('play-100', 1);
+    updateAchievementProgress('play-250', 1);
+    updateAchievementProgress('play-500', 1);
 
     const now = new Date();
     if (now.getHours() >= 0 && now.getHours() < 3) {
       updateAchievementProgress('play-at-midnight', 1);
     }
-
-  }, [updateAchievementProgress]);
+    if (now.getDay() === 0 || now.getDay() === 6) {
+      updateAchievementProgress('play-on-weekend', 1);
+    }
+  }, [updateAchievementProgress, clearAchievementsToSync]);
 
   const togglePause = useCallback(() => {
     setDisplayState(prev => {
