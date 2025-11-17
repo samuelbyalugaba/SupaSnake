@@ -1,0 +1,139 @@
+
+rules_version = '2';
+
+function isOwner(userId) {
+  return request.auth != null && request.auth.uid == userId;
+}
+
+function isAuthenticated() {
+    return request.auth != null;
+}
+
+function isNestAdmin(nestId) {
+    return isAuthenticated() && get(/databases/$(database)/documents/nests/$(nestId)/members/$(request.auth.uid)).data.role == 'admin';
+}
+
+function isNestModerator(nestId) {
+    let role = get(/databases/$(database)/documents/nests/$(nestId)/members/$(request.auth.uid)).data.role;
+    return isAuthenticated() && (role == 'admin' || role == 'moderator');
+}
+
+function isNestMember(nestId) {
+    return isAuthenticated() && exists(/databases/$(database)/documents/nests/$(nestId)/members/$(request.auth.uid));
+}
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- USER DATA & STATS ---
+
+    // The /users/{userId}/stats/summary document holds all stats.
+    match /users/{userId}/stats/summary {
+      allow read, create, update: if isOwner(userId);
+    }
+    
+    // Other user-specific sub-collections (achievements, cosmetics)
+    match /users/{userId}/{collection}/{docId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // --- LEAGUE DATA ---
+    match /league-players/{userId} {
+      // Anyone can read for leaderboards
+      allow get, list: if isAuthenticated();
+      // Only the user can create their own record
+      allow create: if isOwner(userId);
+      // Only the user can update their record (e.g. equipped cosmetic)
+      // League points should be updated via transactions/server-side logic, but we allow client updates for now.
+      allow update: if isOwner(userId);
+      // No one can delete a player record.
+      allow delete: if false;
+    }
+
+
+    // --- USERNAME REGISTRY ---
+    match /usernames/{username} {
+      // Any authenticated user can create a username document if it doesn't exist.
+      // This is used to claim a unique username during sign-up.
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      // No one can read the list of usernames or modify/delete them.
+      allow read, update, delete: if false;
+    }
+    
+    // --- NEST NAME REGISTRY ---
+    match /nest-names/{nestName} {
+      // Allow an authenticated user to claim a nest name as part of the transaction.
+      allow create: if isAuthenticated();
+      // No one can read, update, or delete entries to prevent tampering.
+      allow read, update, delete: if false;
+    }
+    
+    // --- NESTS ---
+
+    // Rules for the main Nests collection
+    match /nests/{nestId} {
+        // Allow reads for any authenticated user. Needed for client-side queries and rule checks.
+        allow get, list: if isAuthenticated();
+
+        // Allow any authenticated user to create a new nest, with validation.
+        allow create: if isAuthenticated()
+                      && request.resource.data.ownerId == request.auth.uid;
+                      
+        // Only admins can update nest details (motto, publicity, etc.)
+        allow update: if isNestAdmin(nestId);
+        
+        // Nests cannot be deleted for now.
+        allow delete: if false; 
+    }
+
+    // Rules for Nest Members sub-collection
+    match /nests/{nestId}/members/{userId} {
+        // Any nest member can see who else is in the nest
+        allow get, list: if isNestMember(nestId);
+
+        // A user can create their own membership document under two specific conditions:
+        // 1. They are creating their own 'admin' role (for Nest creation).
+        // 2. They are creating their own 'member' role to join a PUBLIC Nest.
+        allow create: if isOwner(userId) && (
+          (request.resource.data.role == 'admin') ||
+          (request.resource.data.role == 'member' && get(/databases/$(database)/documents/nests/$(nestId)).data.isPublic == true)
+        );
+
+        // Only admins can change roles
+        allow update: if isNestAdmin(nestId);
+        
+        // Only admins/moderators can kick members (delete their membership doc)
+        // Users can also leave a nest themselves
+        allow delete: if isNestModerator(nestId) || isOwner(userId);
+    }
+    
+    // --- CHAT RULES ---
+    match /global-messages/{messageId} {
+      allow list, get: if isAuthenticated();
+      allow create: if isAuthenticated()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.text is string
+                    && request.resource.data.text.size() > 0
+                    && request.resource.data.text.size() < 300;
+      allow update, delete: if false;
+    }
+    
+    match /nests/{nestId}/messages/{messageId} {
+        allow read, create: if isNestMember(nestId)
+                         && request.resource.data.userId == request.auth.uid
+                         && request.resource.data.text is string
+                         && request.resource.data.text.size() > 0
+                         && request.resource.data.text.size() < 300;
+        allow update, delete: if false;
+    }
+    
+    match /dms/{channelId}/messages/{messageId} {
+        // Users can only read/write to DM channels they are a part of.
+        // This assumes the channelId is structured like `userId1_userId2`
+        allow read, create: if isAuthenticated() && request.auth.uid in channelId.split('_');
+        allow update, delete: if false;
+    }
+
+    // No other collections are publicly accessible by default.
+  }
+}
