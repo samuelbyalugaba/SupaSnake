@@ -41,11 +41,8 @@ service cloud.firestore {
     match /league-players/{userId} {
       // Anyone can read for leaderboards
       allow get, list: if isAuthenticated();
-      // Only the user can create their own record
-      allow create: if isOwner(userId);
-      // Only the user can update their record (e.g. equipped cosmetic)
-      // League points should be updated via transactions/server-side logic, but we allow client updates for now.
-      allow update: if isOwner(userId);
+      // A user can create or update their own league document.
+      allow write: if isOwner(userId);
       // No one can delete a player record.
       allow delete: if false;
     }
