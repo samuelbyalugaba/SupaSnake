@@ -38,8 +38,12 @@ export const useNests = () => {
 
     // --- Actions ---
     const createNest = useCallback(async (data: { name: string; motto: string; isPublic: boolean }, cost: number) => {
-        if (!user || !stats) {
+        if (!user) {
             toast({ variant: 'destructive', title: 'You must be logged in to create a Nest.' });
+            return;
+        }
+        if (!stats) {
+            toast({ variant: 'destructive', title: 'User data not loaded yet.' });
             return;
         }
         if (stats.nestId) {
@@ -109,7 +113,10 @@ export const useNests = () => {
     }, [user, db, stats, toast]);
     
     const joinNest = useCallback(async (nestId: string) => {
-        if (!user || !stats) return;
+        if (!user || !stats) {
+            toast({ variant: 'destructive', title: 'You must be logged in to join a Nest.' });
+            return;
+        };
         setIsJoining(nestId);
         const nestRef = doc(db, 'nests', nestId);
         const nestMemberRef = doc(db, `nests/${nestId}/members`, user.uid);
@@ -140,7 +147,10 @@ export const useNests = () => {
     }, [user, db, stats, toast]);
 
     const leaveNest = useCallback(async () => {
-        if (!user || !stats?.nestId || !stats) return;
+        if (!user || !stats?.nestId || !stats) {
+            toast({ variant: 'destructive', title: 'You must be in a Nest to leave it.' });
+            return;
+        }
         setIsLeaving(true);
         const nestRef = doc(db, 'nests', stats.nestId);
         const selfMemberRef = doc(db, `nests/${stats.nestId}/members`, user.uid);
@@ -170,7 +180,10 @@ export const useNests = () => {
     }, [user, db, stats, toast]);
 
     const kickMember = useCallback(async (userId: string) => {
-        if (!user || !stats?.nestId) return;
+        if (!user || !stats?.nestId) {
+            toast({ variant: 'destructive', title: 'Error', description: 'You must be in a Nest to manage members.' });
+            return;
+        }
         setIsKicking(userId);
         const nestRef = doc(db, 'nests', stats.nestId);
         const memberRef = doc(db, `nests/${stats.nestId}/members`, userId);
@@ -203,7 +216,10 @@ export const useNests = () => {
     }, [user, db, stats?.nestId, toast]);
 
     const updateMemberRole = useCallback(async (userId: string, role: NestMemberRole) => {
-        if (!user || !stats?.nestId) return;
+        if (!user || !stats?.nestId) {
+             toast({ variant: 'destructive', title: 'Error', description: 'You must be in a Nest to manage members.' });
+            return;
+        }
         setIsUpdatingRole(userId);
         const memberRef = doc(db, `nests/${stats.nestId}/members`, userId);
         try {

@@ -27,7 +27,10 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ open, onOpenChange }) => {
   const [loading, setLoading] = useState(false);
 
   const handleSignUp = async () => {
-    if (!auth || !db) return;
+    if (!auth || !db) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Authentication service not ready. Please try again.' });
+        return;
+    }
     if (username.length < 3 || username.length > 15) {
       toast({ variant: 'destructive', title: 'Invalid Username', description: 'Username must be between 3 and 15 characters.' });
       return;
@@ -87,7 +90,10 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ open, onOpenChange }) => {
   };
 
   const handleLogin = async () => {
-    if (!auth) return;
+    if (!auth) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Authentication service not ready. Please try again.' });
+        return;
+    }
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);

@@ -27,6 +27,7 @@ export const useCosmetics = () => {
     const equippedCosmetic = useMemo(() => stats?.equippedCosmetic || 'default', [stats]);
 
     const isCosmeticUnlocked = useCallback((cosmeticId: string) => {
+        if (!user) return false;
         const cosmetic = ALL_COSMETICS.find(c => c.id === cosmeticId);
         if (!cosmetic) return false;
         if (cosmetic.cost === 0 && !cosmetic.achievementId) return true; // Default skin
@@ -39,10 +40,18 @@ export const useCosmetics = () => {
 
         // Check if purchased
         return unlockedCosmetics?.some(c => c.id === cosmeticId) || false;
-    }, [unlockedCosmetics, achievements]);
+    }, [unlockedCosmetics, achievements, user]);
 
     const equipCosmetic = useCallback(async (cosmeticId: string) => {
-        if (!user || !isCosmeticUnlocked(cosmeticId)) return;
+        if (!user) {
+            toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to equip cosmetics.' });
+            return;
+        }
+        if (!isCosmeticUnlocked(cosmeticId)) {
+            toast({ variant: 'destructive', title: 'Error', description: 'You have not unlocked this cosmetic.' });
+            return;
+        }
+
         const statsRef = doc(db, `users/${user.uid}/stats/summary`);
         try {
             await updateDoc(statsRef, { equippedCosmetic: cosmeticId });
@@ -56,7 +65,10 @@ export const useCosmetics = () => {
     }, [user, db, toast, isCosmeticUnlocked]);
 
     const purchaseCosmetic = useCallback(async (cosmeticId: string, cost: number) => {
-        if (!user || !stats || isPurchasing) return;
+        if (!user || !stats || isPurchasing) {
+            toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to purchase cosmetics.' });
+            return;
+        }
         if (stats.neonBits < cost) {
             toast({ variant: 'destructive', title: 'Not enough Neon Bits!', description: 'Play more games to earn currency.' });
             return;
@@ -91,7 +103,8 @@ export const useCosmetics = () => {
     }, [user, db, toast, stats, isPurchasing]);
 
     const unlockCosmetic = useCallback(async (cosmeticId: string) => {
-        if (!user || isCosmeticUnlocked(cosmeticId)) return;
+        if (!user) return; // Guard clause
+        if (isCosmeticUnlocked(cosmeticId)) return;
         const cosmeticRef = doc(db, `users/${user.uid}/cosmetics`, cosmeticId);
         try {
             await setDoc(cosmeticRef, { id: cosmeticId, unlockedAt: serverTimestamp() });

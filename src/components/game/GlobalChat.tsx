@@ -90,7 +90,11 @@ const GlobalChat: React.FC = () => {
   
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !user || isSending) return;
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to send messages.' });
+        return;
+    }
+    if (!input.trim() || isSending) return;
 
     setIsSending(true);
     const messageText = input;

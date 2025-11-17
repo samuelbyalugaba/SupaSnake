@@ -19,28 +19,21 @@ export const useStats = () => {
 
     const { data: stats, isLoading } = useDoc<UserStats>(statsRef);
     
-    const updateStatsAndAchievements = useCallback(async ({ score, achievementsToSync }: { score: number; foodEaten: number; achievementsToSync: Map<string, { value: number; type: 'max' | 'cumulative' }>}) => {
-        if (!statsRef || !user) return;
+    const updateStatsAndAchievements = useCallback(async ({ score, foodEaten, achievementsToSync }: { score: number; foodEaten: number; achievementsToSync: Map<string, { value: number; type: 'max' | 'cumulative' }>}) => {
+        if (!user) {
+            console.error("Attempted to update stats for a null user.");
+            clearAchievementsToSync();
+            return;
+        };
+
+        if (!statsRef) return;
         
         try {
             const batch = writeBatch(db);
             const bitsEarned = Math.floor(score / 5);
             const leaguePointsGained = Math.floor(score / 10);
-            const userStats = stats || { highScore: 0, gamesPlayed: 0, totalScore: 0, neonBits: 0, leaguePoints: 0, equippedCosmetic: 'default' };
-
-            // Add cumulative game stats to the sync map
-            achievementsToSync.set('first-game', { value: 1, type: 'cumulative' });
-            achievementsToSync.set('play-10', { value: 1, type: 'cumulative' });
-            achievementsToSync.set('play-50', { value: 1, type: 'cumulative' });
-            achievementsToSync.set('play-100', { value: 1, type: 'cumulative' });
-            achievementsToSync.set('play-250', { value: 1, type: 'cumulative' });
-            achievementsToSync.set('play-500', { value: 1, type: 'cumulative' });
             
-            const deathCountAchievement = achievements.find(a => a.id === 'ten-deaths');
-            if (deathCountAchievement && !deathCountAchievement.isUnlocked) {
-                 achievementsToSync.set('ten-deaths', { value: 1, type: 'cumulative' });
-                 achievementsToSync.set('hundred-deaths', { value: 1, type: 'cumulative' });
-            }
+            const userStats = stats || { highScore: 0, gamesPlayed: 0, totalScore: 0, neonBits: 0, leaguePoints: 0, equippedCosmetic: 'default' };
 
             // Use set with merge:true to create the document if it doesn't exist, or update it if it does.
             batch.set(statsRef, {
@@ -75,7 +68,7 @@ export const useStats = () => {
         } catch (error) {
             console.error("Error updating stats and achievements:", error);
         }
-    }, [statsRef, user, db, syncAchievements, clearAchievementsToSync, refetchAchievements, stats, achievements]);
+    }, [statsRef, user, db, syncAchievements, clearAchievementsToSync, refetchAchievements, stats]);
 
     return { stats, isLoading, updateStatsAndAchievements };
 };
