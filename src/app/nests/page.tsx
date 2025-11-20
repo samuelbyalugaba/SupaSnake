@@ -26,6 +26,7 @@ import GlobalChat from '@/components/game/GlobalChat';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 const createNestSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters").max(20, "Name cannot be longer than 20 characters"),
@@ -205,7 +206,7 @@ const MemberManagementMenu = ({ member, self }: { member: NestMember, self?: Nes
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" disabled={isLoading} className="absolute top-2 right-2">
+                <Button variant="ghost" size="icon" disabled={isLoading}>
                     {isLoading ? <Loader2 className="animate-spin"/> : <MoreVertical />}
                 </Button>
             </DropdownMenuTrigger>
@@ -263,14 +264,24 @@ const NestMembersTab = () => {
         
         const getMemberStats = async () => {
             if (!db) return;
-            const memberDocs = await getDocs(query(collection(db, 'league-players'), where('userId', 'in', memberIds)));
-            const playersData = new Map(memberDocs.docs.map(doc => [doc.id, doc.data() as leaguePlayer]));
+            // Limit the 'in' query to 10 members at a time, as per Firestore limits
+            const memberChunks: string[][] = [];
+            for (let i = 0; i < memberIds.length; i += 10) {
+                memberChunks.push(memberIds.slice(i, i + 10));
+            }
+
+            const playersData = new Map<string, leaguePlayer>();
+            for(const chunk of memberChunks) {
+                const memberDocs = await getDocs(query(collection(db, 'league-players'), where('userId', 'in', chunk)));
+                memberDocs.docs.forEach(doc => {
+                    playersData.set(doc.id, doc.data() as leaguePlayer);
+                });
+            }
             
             const detailedMembers = nestMembers.map(member => {
                 const playerData = playersData.get(member.userId);
                 return {
                     ...member,
-                    totalScore: stats?.totalScore, // This seems incorrect, there is no totalScore in leaguePlayer
                     leaguePoints: playerData?.leaguePoints ?? 0,
                 };
             });
@@ -280,11 +291,11 @@ const NestMembersTab = () => {
 
         getMemberStats();
 
-    }, [nestMembers, db, stats?.totalScore]);
+    }, [nestMembers, db]);
 
 
     if (isUserNestLoading || isMemberStatsLoading) {
-         return <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{Array.from({length: 4}).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}</div>
+         return <div className="space-y-2">{Array.from({length: 4}).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
     }
 
     const self = nestMembers.find(m => m.userId === user?.uid);
@@ -297,31 +308,45 @@ const NestMembersTab = () => {
     });
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {sortedMembers.map(member => {
-                const roleIcon = member.role === 'admin' ? <Crown className="text-yellow-400"/> : member.role === 'moderator' ? <Shield className="text-blue-400"/> : <User className="text-gray-400"/>;
-                return (
-                    <Card key={member.userId} className="bg-muted/30 relative">
-                        <CardHeader className="flex flex-row items-center gap-4 space-y-0 pb-2">
-                             <Avatar>
-                                <AvatarFallback>{member.username.charAt(0).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                                <CardTitle className="text-lg flex items-center gap-2">{roleIcon} {member.username}</CardTitle>
-                                <CardDescription>Joined {member.joinedAt ? formatDistanceToNow(member.joinedAt.toDate(), { addSuffix: true }) : 'a while ago'}</CardDescription>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="flex justify-around text-center">
-                            <div>
-                                <p className="text-2xl font-bold text-primary">{member.leaguePoints?.toLocaleString() ?? 'N/A'}</p>
-                                <p className="text-xs text-muted-foreground flex items-center gap-1 justify-center"><Trophy/> LP</p>
-                            </div>
-                        </CardContent>
-                        {user?.uid !== member.userId && <MemberManagementMenu member={member} self={self} />}
-                    </Card>
-                )
-            })}
-        </div>
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Member</TableHead>
+                    <TableHead className="hidden sm:table-cell">Joined</TableHead>
+                    <TableHead className="text-right">League Points</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {sortedMembers.map(member => {
+                    const roleIcon = member.role === 'admin' ? <Crown className="text-yellow-400 w-4 h-4"/> : member.role === 'moderator' ? <Shield className="text-blue-400 w-4 h-4"/> : <User className="text-gray-400 w-4 h-4"/>;
+                    return (
+                        <TableRow key={member.userId}>
+                            <TableCell>
+                                <div className="flex items-center gap-3">
+                                    <Avatar className="w-8 h-8">
+                                        <AvatarFallback>{member.username.charAt(0).toUpperCase()}</AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                        <p className="font-semibold flex items-center gap-1.5">{roleIcon} {member.username}</p>
+                                        <p className="text-xs text-muted-foreground capitalize sm:hidden">{member.role}</p>
+                                    </div>
+                                </div>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground hidden sm:table-cell">
+                                {member.joinedAt ? formatDistanceToNow(member.joinedAt.toDate(), { addSuffix: true }) : 'a while ago'}
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-primary">
+                                {member.leaguePoints?.toLocaleString() ?? 0}
+                            </TableCell>
+                            <TableCell>
+                                {user?.uid !== member.userId && <MemberManagementMenu member={member} self={self} />}
+                            </TableCell>
+                        </TableRow>
+                    )
+                })}
+            </TableBody>
+        </Table>
     )
 }
 
