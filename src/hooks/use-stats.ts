@@ -2,7 +2,7 @@
 'use client';
 
 import { useMemo, useCallback } from 'react';
-import { useUser, useFirestore, useDoc } from '@/firebase';
+import { useUser, useFirestore, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { doc, writeBatch, increment, setDoc } from 'firebase/firestore';
 import type { UserStats } from '@/lib/types';
 import { useAchievements } from '@/context/AchievementContext';
@@ -20,56 +20,55 @@ export const useStats = () => {
     const { data: stats, isLoading } = useDoc<UserStats>(statsRef);
     
     const updateStatsAndAchievements = useCallback(async ({ score, foodEaten, achievementsToSync }: { score: number; foodEaten: number; achievementsToSync: Map<string, { value: number; type: 'max' | 'cumulative' }>}) => {
-        if (!user || !db) {
-            clearAchievementsToSync();
-            return;
-        };
-
+        if (!user || !db) return;
         if (!statsRef) return;
         
-        try {
-            const batch = writeBatch(db);
-            const bitsEarned = Math.floor(score / 5);
-            const leaguePointsGained = Math.floor(score / 10);
-            
-            const userStats = stats || { highScore: 0, gamesPlayed: 0, totalScore: 0, neonBits: 0, leaguePoints: 0, equippedCosmetic: 'default' };
+        const batch = writeBatch(db);
+        const bitsEarned = Math.floor(score / 5);
+        const leaguePointsGained = Math.floor(score / 10);
+        
+        const userStats = stats || { highScore: 0, gamesPlayed: 0, totalScore: 0, neonBits: 0, leaguePoints: 0, equippedCosmetic: 'default' };
 
-            // Use set with merge:true to create the document if it doesn't exist, or update it if it does.
-            batch.set(statsRef, {
-                highScore: Math.max(score, userStats.highScore),
-                gamesPlayed: increment(1),
-                totalScore: increment(score),
-                neonBits: increment(bitsEarned),
-                leaguePoints: increment(leaguePointsGained),
-            }, { merge: true });
-            
-            // Also update the public league-players document
-            const leaguePlayerRef = doc(db, `league-players/${user.uid}`);
-            
-            // Use set with merge to handle creation for new players and updates for existing ones.
-            batch.set(leaguePlayerRef, {
-                leaguePoints: increment(leaguePointsGained),
-                username: user.displayName,
-                equippedCosmetic: userStats.equippedCosmetic
-            }, { merge: true });
+        const statsUpdatePayload = {
+            highScore: Math.max(score, userStats.highScore),
+            gamesPlayed: increment(1),
+            totalScore: increment(score),
+            neonBits: increment(bitsEarned),
+            leaguePoints: increment(leaguePointsGained),
+        };
+        batch.set(statsRef, statsUpdatePayload, { merge: true });
+        
+        const leaguePlayerRef = doc(db, `league-players/${user.uid}`);
+        const leaguePlayerUpdatePayload = {
+            leaguePoints: increment(leaguePointsGained),
+            username: user.displayName,
+            equippedCosmetic: userStats.equippedCosmetic
+        };
+        batch.set(leaguePlayerRef, leaguePlayerUpdatePayload, { merge: true });
 
-
-            // Sync achievements
-            if (achievementsToSync.size > 0) {
-                await syncAchievements(batch, achievementsToSync);
-            }
-            
-            await batch.commit();
-            
-            clearAchievementsToSync();
-            refetchAchievements();
-
-        } catch (error) {
-            console.error("Error updating stats and achievements:", error);
+        if (achievementsToSync.size > 0) {
+            await syncAchievements(batch, achievementsToSync);
         }
+        
+        batch.commit()
+            .then(() => {
+                clearAchievementsToSync();
+                refetchAchievements();
+            })
+            .catch((error) => {
+                const permissionError = new FirestorePermissionError({
+                    path: `users/${user.uid} (batched write)`,
+                    operation: 'update',
+                    requestResourceData: {
+                        stats: statsUpdatePayload,
+                        league: leaguePlayerUpdatePayload,
+                        achievements: Object.fromEntries(achievementsToSync.entries())
+                    }
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
+
     }, [statsRef, user, db, syncAchievements, clearAchievementsToSync, refetchAchievements, stats]);
 
     return { stats, isLoading, updateStatsAndAchievements };
 };
-
-    
