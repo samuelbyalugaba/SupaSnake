@@ -217,7 +217,7 @@ export default function LeaguesPage() {
   return (
     <div className="container mx-auto p-4 md:p-8 space-y-8">
       {/* 1. League Overview / Hero Section */}
-      <Card className="bg-card/50 border-primary/20 text-center overflow-hidden">
+      <Card className="bg-card/50 border-primary/20 text-center overflow-hidden relative">
         <div className="absolute inset-0 bg-grid-pattern opacity-10 animate-pan-down -z-10"></div>
         <CardHeader>
           <h1 
