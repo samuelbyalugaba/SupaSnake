@@ -25,26 +25,19 @@ function isNestMember(nestId) {
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- USER DATA & STATS ---
-
-    // The /users/{userId}/stats/summary document holds all stats.
-    match /users/{userId}/stats/summary {
-      allow read, create, update: if isOwner(userId);
-    }
-    
-    // Other user-specific sub-collections (achievements, cosmetics)
-    match /users/{userId}/{collection}/{docId} {
+    // --- USER DATA, STATS, & SUB-COLLECTIONS ---
+    // A user can read and write to any document within their own user path.
+    match /users/{userId}/{document=**} {
       allow read, write: if isOwner(userId);
     }
-
+    
     // --- LEAGUE DATA ---
     match /league-players/{userId} {
       // Anyone can read for leaderboards
       allow get, list: if isAuthenticated();
-      // Only the user can create their own record
+      // A user can create their own league document.
       allow create: if isOwner(userId);
-      // Only the user can update their record (e.g. equipped cosmetic)
-      // League points should be updated via transactions/server-side logic, but we allow client updates for now.
+      // A user can only update their own league document.
       allow update: if isOwner(userId);
       // No one can delete a player record.
       allow delete: if false;
