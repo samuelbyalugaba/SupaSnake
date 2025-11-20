@@ -25,7 +25,7 @@ export const useStats = () => {
         
         const batch = writeBatch(db);
         const bitsEarned = Math.floor(score / 5);
-        const leaguePointsGained = Math.floor(score / 10);
+        const leaguePointsGained = Math.floor(score / 5);
         
         const userStats = stats || { highScore: 0, gamesPlayed: 0, totalScore: 0, neonBits: 0, leaguePoints: 0, equippedCosmetic: 'default' };
 
