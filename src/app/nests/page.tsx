@@ -17,7 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import type { Nest, NestMember, NestMemberRole, leaguePlayer, UserStats } from '@/lib/types';
+import type { Nest, NestMember, NestMemberRole, leaguePlayer, UserStats, UpdateNestRequest } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { NestBanner, NEST_BANNERS } from '@/components/game/NestBanner';
@@ -35,16 +35,23 @@ const createNestSchema = z.object({
   emblemId: z.string(),
 });
 
+const updateNestSchema = z.object({
+  motto: z.string().min(5, "Motto must be at least 5 characters").max(50, "Motto cannot be longer than 50 characters"),
+  isPublic: z.boolean(),
+  emblemId: z.string(),
+});
+
+
 type CreateNestFormValues = z.infer<typeof createNestSchema>;
 
-const EmblemPicker = ({ field, form }: { field: any, form: any }) => {
+const EmblemPicker = ({ field, form, disabled }: { field: any, form: any, disabled?: boolean }) => {
     const [colorIndex, iconName] = field.value?.split('-') || ['0', 'Shield'];
 
     const handleColorChange = (index: number) => {
-        form.setValue('emblemId', `${index}-${iconName}`);
+        form.setValue('emblemId', `${index}-${iconName}`, { shouldDirty: true });
     };
     const handleIconChange = (name: string) => {
-        form.setValue('emblemId', `${colorIndex}-${name}`);
+        form.setValue('emblemId', `${colorIndex}-${name}`, { shouldDirty: true });
     };
 
     return (
@@ -61,6 +68,7 @@ const EmblemPicker = ({ field, form }: { field: any, form: any }) => {
                         type="button"
                         variant="outline"
                         size="icon"
+                        disabled={disabled}
                         className={cn("w-8 h-8 rounded-full", colorClass.split(' ')[0], parseInt(colorIndex) === index && "ring-2 ring-primary ring-offset-2 ring-offset-background")}
                         onClick={() => handleColorChange(index)}
                     />
@@ -77,6 +85,7 @@ const EmblemPicker = ({ field, form }: { field: any, form: any }) => {
                                 type="button"
                                 variant={iconName === icon ? 'default' : 'outline'}
                                 size="icon"
+                                disabled={disabled}
                                 onClick={() => handleIconChange(icon)}
                             >
                                 {/* This will just be a generic user icon, but the preview shows the real one */}
@@ -351,7 +360,77 @@ const NestMembersTab = () => {
 }
 
 const NestSettingsTab = () => {
-    return <p className="text-center p-8 text-muted-foreground">Nest settings coming soon!</p>
+    const { user } = useUser();
+    const { userNest, nestMembers, updateNestSettings, isUpdatingSettings } = useNests();
+
+    const self = nestMembers.find(m => m.userId === user?.uid);
+    const isAdmin = self?.role === 'admin';
+
+    const form = useForm<z.infer<typeof updateNestSchema>>({
+        resolver: zodResolver(updateNestSchema),
+        defaultValues: {
+            motto: userNest?.motto || '',
+            isPublic: userNest?.isPublic || false,
+            emblemId: userNest?.emblemId || '0-Crown',
+        },
+        mode: 'onChange',
+    });
+
+     React.useEffect(() => {
+        if (userNest) {
+            form.reset({
+                motto: userNest.motto,
+                isPublic: userNest.isPublic,
+                emblemId: userNest.emblemId,
+            });
+        }
+    }, [userNest, form]);
+
+    if (!isAdmin) {
+        return <p className="text-center p-8 text-muted-foreground">Only the Nest admin can change settings.</p>;
+    }
+
+    const onSubmit = (data: z.infer<typeof updateNestSchema>) => {
+        updateNestSettings(data);
+    };
+
+
+    return (
+        <Card className="border-none shadow-none">
+            <CardContent>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                        <FormField control={form.control} name="motto" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Nest Motto</FormLabel>
+                                <FormControl><Input {...field} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={form.control} name="emblemId" render={({ field }) => (
+                            <FormItem>
+                                <FormControl>
+                                    <EmblemPicker field={field} form={form} disabled={isUpdatingSettings}/>
+                                </FormControl>
+                            </FormItem>
+                        )}/>
+                        <FormField control={form.control} name="isPublic" render={({ field }) => (
+                            <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                                <div>
+                                    <FormLabel>Public Nest</FormLabel>
+                                    <p className="text-sm text-muted-foreground">Allow anyone to join instantly.</p>
+                                </div>
+                                <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isUpdatingSettings}/></FormControl>
+                            </FormItem>
+                        )} />
+                        <Button type="submit" className="w-full" disabled={isUpdatingSettings || !form.formState.isDirty}>
+                            {isUpdatingSettings ? <><Loader2 className="animate-spin" /> Saving...</> : "Save Changes"}
+                        </Button>
+                    </form>
+                </Form>
+            </CardContent>
+        </Card>
+    );
 }
 
 

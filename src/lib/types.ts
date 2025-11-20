@@ -112,3 +112,9 @@ export type CreateNestRequest = {
     isPublic: boolean;
     emblemId: string;
 };
+
+export type UpdateNestRequest = {
+    motto: string;
+    isPublic: boolean;
+    emblemId: string;
+};

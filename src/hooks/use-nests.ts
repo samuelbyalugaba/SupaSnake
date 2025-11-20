@@ -4,7 +4,7 @@
 import { useMemo, useCallback, useState } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, doc, runTransaction, serverTimestamp, writeBatch, query, where, getDocs, deleteDoc, updateDoc, getDoc, addDoc } from 'firebase/firestore';
-import type { CreateNestRequest, Nest, NestMember, NestMemberRole, UserStats } from '@/lib/types';
+import type { CreateNestRequest, Nest, NestMember, NestMemberRole, UserStats, UpdateNestRequest } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useStats } from './use-stats';
 
@@ -19,6 +19,7 @@ export const useNests = () => {
     const [isLeaving, setIsLeaving] = useState(false);
     const [isKicking, setIsKicking] = useState<string | null>(null);
     const [isUpdatingRole, setIsUpdatingRole] = useState<string | null>(null);
+    const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
 
 
     // --- Data Fetching ---
@@ -269,6 +270,31 @@ export const useNests = () => {
         }
     }, [user, db, stats?.nestId, toast]);
 
+    const updateNestSettings = useCallback(async (data: UpdateNestRequest) => {
+        if (!user || !stats?.nestId) {
+            toast({ variant: 'destructive', title: 'Error', description: 'No Nest found to update.' });
+            return;
+        }
+        setIsUpdatingSettings(true);
+        const nestRef = doc(db, 'nests', stats.nestId);
+        try {
+            await updateDoc(nestRef, data);
+            toast({ title: 'Nest settings updated successfully!' });
+        } catch (error: any) {
+             if (error.code?.includes('permission-denied')) {
+                 const permissionError = new FirestorePermissionError({
+                    path: nestRef.path,
+                    operation: 'update',
+                    requestResourceData: data,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            }
+            toast({ variant: 'destructive', title: 'Failed to update settings', description: error.message });
+        } finally {
+            setIsUpdatingSettings(false);
+        }
+    }, [user, db, stats?.nestId, toast]);
+
     const isLoading = areAllNestsLoading || isUserNestLoading || areMembersLoading || arePublicNestsLoading;
 
     return {
@@ -276,7 +302,7 @@ export const useNests = () => {
         allNests: allNests || [],
         isLoading,
         isUserNestLoading: isUserNestLoading || areMembersLoading,
-        isCreating, isJoining, isLeaving, isKicking, isUpdatingRole,
+        isCreating, isJoining, isLeaving, isKicking, isUpdatingRole, isUpdatingSettings,
         userNest,
         nestMembers: nestMembers || [],
         createNest,
@@ -284,6 +310,7 @@ export const useNests = () => {
         leaveNest,
         kickMember,
         updateMemberRole,
+        updateNestSettings,
         stats
     };
 };
