@@ -107,7 +107,7 @@ const GlobalChat = ({ defaultTab = 'global' }: { defaultTab?: ChatTab }) => {
   const nestMessagesQuery = useMemoFirebase(() => (nestMessagesRef ? query(nestMessagesRef, orderBy('timestamp', 'desc'), limit(50)) : null), [nestMessagesRef]);
 
   const { data: globalMessages, isLoading: isGlobalLoading } = useCollection<Message>(activeTab === 'global' ? globalMessagesQuery : null);
-  const { data: nestMessages, isLoading: isNestLoading } = useCollection<Message>(active-tab === 'nest' ? nestMessagesQuery : null);
+  const { data: nestMessages, isLoading: isNestLoading } = useCollection<Message>(activeTab === 'nest' ? nestMessagesQuery : null);
   
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
