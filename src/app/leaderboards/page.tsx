@@ -116,7 +116,7 @@ const PlayerLeaderboard = () => {
                     </TableHeader>
                     <TableBody>
                         {players.map((player, index) => (
-                            <TableRow key={player.userId} className={cn(player.userId === user?.uid && "bg-primary/10")}>
+                            <TableRow key={player.userId || index} className={cn(player.userId === user?.uid && "bg-primary/10")}>
                                 <TableCell className="font-bold text-lg">{index + 1}</TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-3">
