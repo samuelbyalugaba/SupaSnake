@@ -2,7 +2,7 @@
 
 Welcome to **Supa Snake**! This is a modern, responsive twist on the classic Snake game, built with a stunning retro-neon aesthetic. Guide your glowing snake to eat the elusive cyber-rat, grow longer, unlock achievements, customize your look, and compete against players worldwide in a persistent online league.
 
-![Supa Snake Gameplay](https://i.imgur.com/y8Z9g8A.png) 
+![Supa Snake Gameplay](https://supasnake.techandgaming.app) 
 
 ## 🚀 Features
 
