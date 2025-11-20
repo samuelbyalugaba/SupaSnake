@@ -14,6 +14,7 @@ import { CosmeticsProvider } from '@/context/CosmeticsContext';
 export const metadata: Metadata = {
   title: 'Supa Snake',
   description: 'A modern, responsive Snake game with a retro neon theme.',
+  manifest: '/manifest.json',
 };
 
 const Footer = () => {
