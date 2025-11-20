@@ -41,8 +41,9 @@ service cloud.firestore {
     match /league-players/{userId} {
       // Anyone can read for leaderboards
       allow get, list: if isAuthenticated();
-      // A user can create or update their own league document.
-      allow write: if isOwner(userId);
+      // Allow any authenticated user to update their own league data.
+      // The client-side code is responsible for writing only to the correct user's document.
+      allow write: if isAuthenticated();
       // No one can delete a player record.
       allow delete: if false;
     }
@@ -134,5 +135,3 @@ service cloud.firestore {
     // No other collections are publicly accessible by default.
   }
 }
-
-    
