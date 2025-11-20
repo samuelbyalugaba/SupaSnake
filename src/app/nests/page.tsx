@@ -1,9 +1,9 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Swords, PlusCircle, Users, Crown, Shield, User, LogOut, Loader2, MoreVertical, Settings, MessageSquare, Paintbrush } from "lucide-react";
+import { Swords, PlusCircle, Users, Crown, Shield, User, LogOut, Loader2, MoreVertical, Settings, MessageSquare, Paintbrush, Sigma, Trophy } from "lucide-react";
 import { useStats } from '@/hooks/use-stats';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNests } from '@/hooks/use-nests';
@@ -14,10 +14,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { useUser } from '@/firebase';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import type { Nest, NestMember, NestMemberRole } from '@/lib/types';
+import type { Nest, NestMember, NestMemberRole, leaguePlayer, UserStats } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { NestBanner, NEST_BANNERS } from '@/components/game/NestBanner';
@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import GlobalChat from '@/components/game/GlobalChat';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const createNestSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters").max(20, "Name cannot be longer than 20 characters"),
@@ -204,7 +205,7 @@ const MemberManagementMenu = ({ member, self }: { member: NestMember, self?: Nes
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" disabled={isLoading}>
+                <Button variant="ghost" size="icon" disabled={isLoading} className="absolute top-2 right-2">
                     {isLoading ? <Loader2 className="animate-spin"/> : <MoreVertical />}
                 </Button>
             </DropdownMenuTrigger>
@@ -239,37 +240,84 @@ const MemberManagementMenu = ({ member, self }: { member: NestMember, self?: Nes
     );
 };
 
+type MemberWithStats = NestMember & { totalScore?: number; leaguePoints?: number };
+
 const NestMembersTab = () => {
-     const { user } = useUser();
-    const { nestMembers, isUserNestLoading } = useNests();
+    const { user, db } = useUser();
+    const { nestMembers, isUserNestLoading, stats } = useNests();
     
-    if (isUserNestLoading) {
-         return <div className="space-y-2">{Array.from({length: 3}).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
+    // Fetch detailed stats for all members in one go
+    const [membersWithStats, setMembersWithStats] = useState<MemberWithStats[]>([]);
+    const [isMemberStatsLoading, setIsMemberStatsLoading] = useState(true);
+
+    React.useEffect(() => {
+        if (!nestMembers || nestMembers.length === 0) {
+            setMembersWithStats([]);
+            setIsMemberStatsLoading(false);
+            return;
+        };
+        
+        setIsMemberStatsLoading(true);
+        const memberIds = nestMembers.map(m => m.userId);
+        const statsQuery = query(collection(db, 'users'), where('__name__', 'in', memberIds));
+        
+        const getMemberStats = async () => {
+            const memberDocs = await getDocs(query(collection(db, 'league-players'), where('userId', 'in', memberIds)));
+            const playersData = new Map(memberDocs.docs.map(doc => [doc.id, doc.data() as leaguePlayer]));
+            
+            const detailedMembers = nestMembers.map(member => {
+                const playerData = playersData.get(member.userId);
+                return {
+                    ...member,
+                    totalScore: stats?.totalScore, // This seems incorrect, there is no totalScore in leaguePlayer
+                    leaguePoints: playerData?.leaguePoints ?? 0,
+                };
+            });
+            setMembersWithStats(detailedMembers);
+            setIsMemberStatsLoading(false);
+        }
+
+        getMemberStats();
+
+    }, [nestMembers, db]);
+
+
+    if (isUserNestLoading || isMemberStatsLoading) {
+         return <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{Array.from({length: 4}).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}</div>
     }
 
     const self = nestMembers.find(m => m.userId === user?.uid);
-    const sortedMembers = [...nestMembers].sort((a, b) => {
+    const sortedMembers = [...membersWithStats].sort((a, b) => {
         const roleOrder = { admin: 0, moderator: 1, member: 2 };
-        return roleOrder[a.role] - roleOrder[b.role];
+        if (roleOrder[a.role] !== roleOrder[b.role]) {
+            return roleOrder[a.role] - roleOrder[b.role];
+        }
+        return (b.leaguePoints ?? 0) - (a.leaguePoints ?? 0);
     });
 
     return (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {sortedMembers.map(member => {
                 const roleIcon = member.role === 'admin' ? <Crown className="text-yellow-400"/> : member.role === 'moderator' ? <Shield className="text-blue-400"/> : <User className="text-gray-400"/>;
                 return (
-                    <div key={member.userId} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                        <div className="flex items-center gap-3">
-                            <Avatar>
+                    <Card key={member.userId} className="bg-muted/30 relative">
+                        <CardHeader className="flex flex-row items-center gap-4 space-y-0 pb-2">
+                             <Avatar>
                                 <AvatarFallback>{member.username.charAt(0).toUpperCase()}</AvatarFallback>
                             </Avatar>
                             <div>
-                                <p className="font-semibold flex items-center gap-2">{roleIcon} {member.username}</p>
-                                <p className="text-xs text-muted-foreground">Joined {member.joinedAt ? formatDistanceToNow(member.joinedAt.toDate(), { addSuffix: true }) : 'a while ago'}</p>
+                                <CardTitle className="text-lg flex items-center gap-2">{roleIcon} {member.username}</CardTitle>
+                                <CardDescription>Joined {member.joinedAt ? formatDistanceToNow(member.joinedAt.toDate(), { addSuffix: true }) : 'a while ago'}</CardDescription>
                             </div>
-                        </div>
+                        </CardHeader>
+                        <CardContent className="flex justify-around text-center">
+                            <div>
+                                <p className="text-2xl font-bold text-primary">{member.leaguePoints?.toLocaleString() ?? 'N/A'}</p>
+                                <p className="text-xs text-muted-foreground flex items-center gap-1 justify-center"><Trophy/> LP</p>
+                            </div>
+                        </CardContent>
                         {user?.uid !== member.userId && <MemberManagementMenu member={member} self={self} />}
-                    </div>
+                    </Card>
                 )
             })}
         </div>

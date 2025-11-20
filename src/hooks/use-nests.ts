@@ -74,7 +74,7 @@ export const useNests = () => {
                     throw new Error("Insufficient funds. Please refresh and try again.");
                 }
                 
-                const nestData = {
+                const nestData: Omit<Nest, 'id'> = {
                     ...data,
                     ownerId: user.uid,
                     memberCount: 1,
@@ -82,10 +82,10 @@ export const useNests = () => {
                 };
                 transaction.set(newNestRef, nestData);
 
-                const memberData = {
+                const memberData: Omit<NestMember, 'joinedAt'> & { joinedAt: any } = {
                     userId: user.uid,
                     username: user.displayName!,
-                    role: 'admin' as NestMemberRole,
+                    role: 'admin',
                     joinedAt: serverTimestamp(),
                 };
                 transaction.set(nestMemberRef, memberData);
@@ -283,6 +283,7 @@ export const useNests = () => {
         joinNest,
         leaveNest,
         kickMember,
-        updateMemberRole
+        updateMemberRole,
+        stats
     };
 };

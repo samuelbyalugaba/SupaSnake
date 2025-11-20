@@ -63,7 +63,7 @@ export type leaguePlayer = {
     username: string;
     leaguePoints: number;
     equippedCosmetic: string;
-}
+};
 
 export type CosmeticRarity = 'Common' | 'Rare' | 'Epic' | 'Legendary' | 'Seasonal';
 
