@@ -71,7 +71,7 @@ export const AchievementProvider = ({ children }: { children: ReactNode }) => {
   }, [userAchievements]);
 
 
-  const updateAchievementProgress = useCallback((id: string, value: number) => {
+  const updateAchievementProgress = useCallback((id: string, value: number, additive = false) => {
     const achievement = combinedAchievements.find(a => a.id === id);
     if (!achievement || achievement.isUnlocked) {
       return;
@@ -80,7 +80,7 @@ export const AchievementProvider = ({ children }: { children: ReactNode }) => {
     const existingProgress = achievementsToSync.current.get(id);
     let newProgressValue;
 
-    if (achievement.type === 'cumulative') {
+    if (additive || achievement.type === 'cumulative') {
         newProgressValue = (existingProgress?.value || 0) + value;
     } else { // 'max'
         newProgressValue = Math.max(existingProgress?.value || 0, value);
@@ -192,3 +192,5 @@ export const useAchievements = () => {
   }
   return context;
 };
+
+    

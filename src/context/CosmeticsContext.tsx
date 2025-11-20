@@ -12,8 +12,8 @@ const CosmeticsContext = createContext<CosmeticsHookType | undefined>(undefined)
 
 // Provider component
 export const CosmeticsProvider = ({ children }: { children: ReactNode }) => {
-  const cosmetics = useCosmeticsData();
-  return <CosmeticsContext.Provider value={cosmetics}>{children}</CosmeticsContext.Provider>;
+  const cosmeticsData = useCosmeticsData();
+  return <CosmeticsContext.Provider value={cosmeticsData}>{children}</CosmeticsContext.Provider>;
 };
 
 // Custom hook to use the context.
@@ -24,3 +24,5 @@ export const useCosmetics = () => {
   }
   return context;
 };
+
+    

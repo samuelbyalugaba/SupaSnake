@@ -29,7 +29,7 @@ service cloud.firestore {
 
     // The /users/{userId}/stats/summary document holds all stats.
     match /users/{userId}/stats/summary {
-      allow read, create, update: if isOwner(userId);
+      allow read, write: if isOwner(userId);
     }
     
     // Other user-specific sub-collections (achievements, cosmetics)
@@ -134,3 +134,5 @@ service cloud.firestore {
     // No other collections are publicly accessible by default.
   }
 }
+
+    

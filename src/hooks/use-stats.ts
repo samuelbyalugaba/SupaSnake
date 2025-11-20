@@ -20,7 +20,7 @@ export const useStats = () => {
     const { data: stats, isLoading } = useDoc<UserStats>(statsRef);
     
     const updateStatsAndAchievements = useCallback(async ({ score, foodEaten, achievementsToSync }: { score: number; foodEaten: number; achievementsToSync: Map<string, { value: number; type: 'max' | 'cumulative' }>}) => {
-        if (!user) {
+        if (!user || !db) {
             clearAchievementsToSync();
             return;
         };
@@ -71,3 +71,5 @@ export const useStats = () => {
 
     return { stats, isLoading, updateStatsAndAchievements };
 };
+
+    
