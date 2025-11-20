@@ -106,6 +106,21 @@ service cloud.firestore {
         allow delete: if isNestModerator(nestId) || isOwner(userId);
     }
     
+    // Rules for Nest Join Requests
+    match /nests/{nestId}/join-requests/{requestId} {
+        // Any member of the nest can see the requests.
+        allow list, get: if isNestMember(nestId);
+        
+        // A user can create a request to join a nest for themselves.
+        allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+
+        // Admins/mods can approve/reject requests.
+        allow update: if isNestModerator(nestId);
+        
+        // A user can cancel (delete) their own request. Admins can also delete them.
+        allow delete: if isNestModerator(nestId) || isOwner(request.resource.data.userId);
+    }
+
     // --- CHAT RULES ---
     match /global-messages/{messageId} {
       allow list, get: if isAuthenticated();

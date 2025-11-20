@@ -23,9 +23,22 @@
         "totalScore": { "type": "number", "description": "The cumulative score across all games played." },
         "neonBits": { "type": "number", "description": "The amount of in-game currency the user has." },
         "equippedCosmetic": { "type": "string", "description": "The ID of the cosmetic the user has equipped." },
-        "nestId": { "type": "string", "description": "The ID of the Nest the user is a member of."}
+        "nestId": { "type": "string", "description": "The ID of the Nest the user is a member of."},
+        "leaguePoints": { "type": "number", "description": "The user's points for the competitive league."}
       },
       "required": []
+    },
+    "leaguePlayer": {
+        "title": "League Player",
+        "description": "Publicly queryable data for a player in the league.",
+        "type": "object",
+        "properties": {
+            "userId": { "type": "string" },
+            "username": { "type": "string" },
+            "leaguePoints": { "type": "number" },
+            "equippedCosmetic": { "type": "string" }
+        },
+        "required": ["userId", "username", "leaguePoints", "equippedCosmetic"]
     },
     "cosmetic": {
         "title": "Cosmetic",
@@ -64,6 +77,19 @@
       },
       "required": ["userId", "username", "role", "joinedAt"]
     },
+    "nestJoinRequest": {
+        "title": "Nest Join Request",
+        "description": "Represents a user's request to join a private Nest.",
+        "type": "object",
+        "properties": {
+            "nestId": { "type": "string" },
+            "userId": { "type": "string" },
+            "username": { "type": "string" },
+            "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+            "requestedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["nestId", "userId", "username", "status", "requestedAt"]
+    },
     "chatMessage": {
       "title": "Chat Message",
       "description": "A message in any chat channel.",
@@ -84,6 +110,15 @@
         "userId": { "type": "string", "description": "The UID of the user who owns this username." }
       },
       "required": ["userId"]
+    },
+    "nestName": {
+      "title": "Nest Name",
+      "description": "A registry document to ensure Nest name uniqueness. The document ID is the lowercase Nest name.",
+      "type": "object",
+      "properties": {
+        "nestId": { "type": "string", "description": "The ID of the Nest that owns this name." }
+      },
+      "required": ["nestId"]
     }
   },
   "auth": {
@@ -106,6 +141,14 @@
       "schema": { "$ref": "#/entities/username" },
       "description": "A collection where each document ID is a unique, lowercase username used for uniqueness checks."
     },
+    "/nest-names/{nestName}": {
+      "schema": { "$ref": "#/entities/nestName" },
+      "description": "A collection where each document ID is a unique, lowercase Nest name used for uniqueness checks."
+    },
+    "/league-players/{userId}": {
+        "schema": { "$ref": "#/entities/leaguePlayer" },
+        "description": "Stores public-facing data for league leaderboards."
+    },
     "/nests/{nestId}": {
       "schema": { "$ref": "#/entities/nest" },
       "description": "Stores all Nests (clans) created by players."
@@ -113,6 +156,10 @@
     "/nests/{nestId}/members/{userId}": {
       "schema": { "$ref": "#/entities/nestMember" },
       "description": "Stores the members and their roles for a specific Nest."
+    },
+    "/nests/{nestId}/join-requests/{requestId}": {
+      "schema": { "$ref": "#/entities/nestJoinRequest" },
+      "description": "Stores requests from users who want to join this private Nest."
     },
     "/global-messages/{messageId}": {
       "schema": { "$ref": "#/entities/chatMessage" },

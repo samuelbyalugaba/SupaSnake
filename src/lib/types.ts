@@ -118,3 +118,12 @@ export type UpdateNestRequest = {
     isPublic: boolean;
     emblemId: string;
 };
+
+export type NestJoinRequest = {
+    id?: string;
+    nestId: string;
+    userId: string;
+    username: string;
+    status: 'pending' | 'approved' | 'rejected';
+    requestedAt: Timestamp;
+};

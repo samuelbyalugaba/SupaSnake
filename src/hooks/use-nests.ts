@@ -4,7 +4,7 @@
 import { useMemo, useCallback, useState } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, doc, runTransaction, serverTimestamp, writeBatch, query, where, getDocs, deleteDoc, updateDoc, getDoc, addDoc } from 'firebase/firestore';
-import type { CreateNestRequest, Nest, NestMember, NestMemberRole, UserStats, UpdateNestRequest } from '@/lib/types';
+import type { CreateNestRequest, Nest, NestMember, NestMemberRole, UserStats, UpdateNestRequest, NestJoinRequest } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useStats } from './use-stats';
 
@@ -20,21 +20,26 @@ export const useNests = () => {
     const [isKicking, setIsKicking] = useState<string | null>(null);
     const [isUpdatingRole, setIsUpdatingRole] = useState<string | null>(null);
     const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
+    const [isRequesting, setIsRequesting] = useState<string | null>(null);
 
 
     // --- Data Fetching ---
     const nestsCollectionRef = useMemo(() => collection(db, 'nests'), [db]);
     
     const { data: allNests, isLoading: areAllNestsLoading } = useCollection<Nest>(nestsCollectionRef);
-
-    const publicNestsQuery = useMemo(() => query(nestsCollectionRef, where("isPublic", "==", true)), [nestsCollectionRef]);
-    const { data: publicNests, isLoading: arePublicNestsLoading } = useCollection<Nest>(publicNestsQuery);
     
     const userNestRef = useMemo(() => (stats?.nestId ? doc(db, 'nests', stats.nestId) : null), [stats?.nestId, db]);
     const { data: userNest, isLoading: isUserNestLoading } = useDoc<Nest>(userNestRef);
 
     const nestMembersRef = useMemo(() => (stats?.nestId ? collection(db, `nests/${stats.nestId}/members`) : null), [stats?.nestId, db]);
     const { data: nestMembers, isLoading: areMembersLoading } = useCollection<NestMember>(nestMembersRef);
+
+    // Fetch active join requests sent BY the current user
+    const userJoinRequestsQuery = useMemo(() => 
+        user ? query(collection(db, 'nest-join-requests'), where('userId', '==', user.uid), where('status', '==', 'pending')) 
+             : null
+    , [db, user]);
+    const { data: userSentRequests, isLoading: areRequestsLoading } = useCollection<NestJoinRequest>(userJoinRequestsQuery);
 
 
     // --- Actions ---
@@ -159,6 +164,49 @@ export const useNests = () => {
             setIsJoining(null);
         }
     }, [user, db, stats, toast]);
+
+    const requestToJoinNest = useCallback(async (nestId: string) => {
+        if (!user || !user.displayName) {
+            toast({ variant: 'destructive', title: 'You must be logged in to send a request.' });
+            return;
+        }
+        setIsRequesting(nestId);
+        
+        const requestRef = collection(db, 'nest-join-requests');
+        
+        // Check if a request already exists for this user and nest
+        const q = query(requestRef, where('userId', '==', user.uid), where('nestId', '==', nestId), where('status', '==', 'pending'));
+        const existingRequest = await getDocs(q);
+
+        if (!existingRequest.empty) {
+            toast({ variant: 'default', title: 'Request already sent', description: "You already have a pending request to join this Nest." });
+            setIsRequesting(null);
+            return;
+        }
+
+        try {
+            await addDoc(requestRef, {
+                nestId,
+                userId: user.uid,
+                username: user.displayName,
+                status: 'pending',
+                requestedAt: serverTimestamp(),
+            });
+            toast({ title: 'Request Sent!', description: "The Nest admin has been notified." });
+        } catch (error: any) {
+             if (error.code?.includes('permission-denied')) {
+                 const permissionError = new FirestorePermissionError({
+                    path: requestRef.path,
+                    operation: 'create',
+                    requestResourceData: { nestId, userId: user.uid, status: 'pending' },
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            }
+            toast({ variant: 'destructive', title: 'Failed to send request', description: error.message });
+        } finally {
+            setIsRequesting(null);
+        }
+    }, [user, db, toast]);
 
     const leaveNest = useCallback(async () => {
         if (!user || !stats?.nestId || !stats) {
@@ -295,18 +343,25 @@ export const useNests = () => {
         }
     }, [user, db, stats?.nestId, toast]);
 
-    const isLoading = areAllNestsLoading || isUserNestLoading || areMembersLoading || arePublicNestsLoading;
+    const isLoading = areAllNestsLoading || isUserNestLoading || areMembersLoading || areRequestsLoading;
 
     return {
-        publicNests: publicNests || [],
         allNests: allNests || [],
         isLoading,
         isUserNestLoading: isUserNestLoading || areMembersLoading,
-        isCreating, isJoining, isLeaving, isKicking, isUpdatingRole, isUpdatingSettings,
+        isCreating, 
+        isJoining, 
+        isLeaving, 
+        isKicking, 
+        isUpdatingRole, 
+        isUpdatingSettings,
+        isRequesting,
+        userSentRequests: userSentRequests || [],
         userNest,
         nestMembers: nestMembers || [],
         createNest,
         joinNest,
+        requestToJoinNest,
         leaveNest,
         kickMember,
         updateMemberRole,

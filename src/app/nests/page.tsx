@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Swords, PlusCircle, Users, Crown, Shield, User, LogOut, Loader2, MoreVertical, Settings, MessageSquare, Paintbrush, Sigma, Trophy } from "lucide-react";
+import { Swords, PlusCircle, Users, Crown, Shield, User, LogOut, Loader2, MoreVertical, Settings, MessageSquare, Paintbrush, Sigma, Trophy, Send, Check, X } from "lucide-react";
 import { useStats } from '@/hooks/use-stats';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNests } from '@/hooks/use-nests';
@@ -163,24 +163,55 @@ const CreateNestForm = () => {
 };
 
 const NestList = () => {
-    const { publicNests, isLoading, joinNest, isJoining } = useNests();
-    const { stats } = useStats();
+    const { allNests, isLoading, joinNest, isJoining, requestToJoinNest, isRequesting, userSentRequests, stats } = useNests();
 
     if (isLoading) {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Array.from({length: 4}).map((_, i) => <Skeleton key={i} className="h-32 w-full" />)}
+                {Array.from({length: 4}).map((_, i) => <Skeleton key={i} className="h-44 w-full" />)}
             </div>
         )
     }
 
-    if (!publicNests || publicNests.length === 0) {
-        return <p className="text-center text-muted-foreground py-8">No public Nests available. Why not create one?</p>
+    if (!allNests || allNests.length === 0) {
+        return <p className="text-center text-muted-foreground py-8">No Nests found. Why not create one?</p>
+    }
+
+    const hasPendingRequest = (nestId: string) => {
+        return userSentRequests.some(req => req.nestId === nestId && req.status === 'pending');
+    }
+
+    const renderActionButton = (nest: Nest) => {
+        if (!!stats?.nestId) return <Button className="w-full" disabled>Already in a Nest</Button>;
+
+        if (nest.isPublic) {
+            return (
+                <Button 
+                    onClick={() => joinNest(nest.id)} 
+                    disabled={isJoining === nest.id}
+                    className="w-full"
+                >
+                    {isJoining === nest.id ? <Loader2 className="animate-spin" /> : "Join"}
+                </Button>
+            );
+        } else {
+            const pending = hasPendingRequest(nest.id);
+            return (
+                 <Button 
+                    onClick={() => requestToJoinNest(nest.id)} 
+                    disabled={isRequesting === nest.id || pending}
+                    variant={pending ? "secondary" : "outline"}
+                    className="w-full"
+                >
+                    {isRequesting === nest.id ? <Loader2 className="animate-spin" /> : pending ? <><Check className="mr-2"/>Requested</> : <><Send className="mr-2"/>Request to Join</>}
+                </Button>
+            )
+        }
     }
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {publicNests.map(nest => (
+            {allNests.map(nest => (
                  <Card key={nest.id} className="bg-card/50 border-primary/20 flex flex-col justify-between">
                     <CardContent className="p-4">
                         <NestBanner nest={nest} />
@@ -188,15 +219,10 @@ const NestList = () => {
                     <CardFooter className="flex-col gap-2">
                         <div className="flex justify-around w-full text-sm">
                             <p><Users className="inline mr-1" size={16} />{nest.memberCount} / 50</p>
-                            <p><Crown className="inline mr-1" size={16} />{nest.totalScore.toLocaleString()}</p>
+                            <p><Trophy className="inline mr-1" size={16} />{nest.totalScore.toLocaleString()}</p>
+                            <p>{nest.isPublic ? "Public" : "Private"}</p>
                         </div>
-                        <Button 
-                            onClick={() => joinNest(nest.id)} 
-                            disabled={isJoining === nest.id || !!stats?.nestId}
-                            className="w-full"
-                        >
-                            {isJoining === nest.id ? <Loader2 className="animate-spin" /> : "Join"}
-                        </Button>
+                        {renderActionButton(nest)}
                     </CardFooter>
                  </Card>
             ))}
