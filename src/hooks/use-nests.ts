@@ -4,7 +4,7 @@
 import { useMemo, useCallback, useState } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, doc, runTransaction, serverTimestamp, writeBatch, query, where, getDocs, deleteDoc, updateDoc, getDoc, addDoc } from 'firebase/firestore';
-import type { Nest, NestMember, NestMemberRole, UserStats } from '@/lib/types';
+import type { CreateNestRequest, Nest, NestMember, NestMemberRole, UserStats } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useStats } from './use-stats';
 
@@ -37,7 +37,7 @@ export const useNests = () => {
 
 
     // --- Actions ---
-    const createNest = useCallback(async (data: { name: string; motto: string; isPublic: boolean }, cost: number) => {
+    const createNest = useCallback(async (data: CreateNestRequest, cost: number) => {
         if (!user || !user.displayName) {
             toast({ variant: 'destructive', title: 'You must be logged in and have a username to create a Nest.' });
             return;
@@ -75,13 +75,10 @@ export const useNests = () => {
                 }
                 
                 const nestData = {
-                    name: data.name,
-                    motto: data.motto,
-                    isPublic: data.isPublic,
+                    ...data,
                     ownerId: user.uid,
                     memberCount: 1,
                     totalScore: stats.totalScore ?? 0,
-                    emblemId: 'default',
                 };
                 transaction.set(newNestRef, nestData);
 
@@ -278,6 +275,7 @@ export const useNests = () => {
         publicNests: publicNests || [],
         allNests: allNests || [],
         isLoading,
+        isUserNestLoading: isUserNestLoading || areMembersLoading,
         isCreating, isJoining, isLeaving, isKicking, isUpdatingRole,
         userNest,
         nestMembers: nestMembers || [],

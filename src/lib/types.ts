@@ -110,7 +110,5 @@ export type CreateNestRequest = {
     name: string;
     motto: string;
     isPublic: boolean;
-    cost: number;
-    creatorId: string;
-    creatorUsername: string;
+    emblemId: string;
 };
