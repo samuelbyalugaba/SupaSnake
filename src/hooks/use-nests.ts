@@ -2,7 +2,7 @@
 'use client';
 
 import { useMemo, useCallback, useState } from 'react';
-import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
+import { useUser, useFirestore, useCollection, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, doc, runTransaction, serverTimestamp, writeBatch, query, where, getDocs, deleteDoc, updateDoc, getDoc, addDoc } from 'firebase/firestore';
 import type { Nest, NestMember, NestMemberRole, UserStats } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -73,40 +73,47 @@ export const useNests = () => {
                 if (!userStatsDoc.exists() || (userStatsDoc.data().neonBits ?? 0) < cost) {
                     throw new Error("Insufficient funds. Please refresh and try again.");
                 }
-
-                // 1. Create the Nest document
-                transaction.set(newNestRef, {
+                
+                const nestData = {
                     name: data.name,
                     motto: data.motto,
                     isPublic: data.isPublic,
                     ownerId: user.uid,
                     memberCount: 1,
                     totalScore: stats.totalScore ?? 0,
-                    emblemId: 'default', // Default emblem
-                });
+                    emblemId: 'default',
+                };
+                transaction.set(newNestRef, nestData);
 
-                // 2. Create the admin member document for the creator
-                transaction.set(nestMemberRef, {
+                const memberData = {
                     userId: user.uid,
-                    username: user.displayName, // Ensure username is not null
-                    role: 'admin',
+                    username: user.displayName!,
+                    role: 'admin' as NestMemberRole,
                     joinedAt: serverTimestamp(),
-                });
+                };
+                transaction.set(nestMemberRef, memberData);
                 
-                // 3. Reserve the unique Nest name
                 transaction.set(nestNameRef, { nestId: newNestRef.id });
 
-                // 4. Update user's stats (deduct cost and add nestId)
                 const newNeonBits = (userStatsDoc.data().neonBits ?? 0) - cost;
-                transaction.update(userStatsRef, {
+                const statsUpdate = {
                     neonBits: newNeonBits,
                     nestId: newNestRef.id,
-                });
+                };
+                transaction.update(userStatsRef, statsUpdate);
             });
 
             toast({ title: "Nest Created!", description: `Welcome to ${data.name}!` });
         } catch (error: any) {
             console.error("Nest creation failed:", error);
+            if (error.code?.includes('permission-denied')) {
+                 const permissionError = new FirestorePermissionError({
+                    path: `(transaction writes)`,
+                    operation: 'create',
+                    requestResourceData: { nestName: data.name.toLowerCase(), nest: newNestRef.path, member: nestMemberRef.path },
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            }
             toast({ variant: 'destructive', title: 'Failed to create Nest', description: error.message });
         } finally {
             setIsCreating(false);
@@ -141,6 +148,14 @@ export const useNests = () => {
             });
             toast({ title: 'Welcome to the Nest!', description: "You have successfully joined."});
         } catch (error: any) {
+             if (error.code?.includes('permission-denied')) {
+                 const permissionError = new FirestorePermissionError({
+                    path: `(transaction writes)`,
+                    operation: 'create',
+                    requestResourceData: { member: nestMemberRef.path, nest: nestRef.path, userStats: userStatsRef.path },
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            }
              toast({ variant: 'destructive', title: 'Failed to join Nest', description: error.message });
         } finally {
             setIsJoining(null);
@@ -174,6 +189,14 @@ export const useNests = () => {
             });
             toast({ title: "You have left the Nest." });
         } catch (error: any) {
+             if (error.code?.includes('permission-denied')) {
+                 const permissionError = new FirestorePermissionError({
+                    path: `(transaction writes)`,
+                    operation: 'delete',
+                    requestResourceData: { member: selfMemberRef.path, nest: nestRef.path, userStats: userStatsRef.path },
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            }
             toast({ variant: 'destructive', title: 'Failed to leave Nest', description: error.message });
         } finally {
             setIsLeaving(false);
@@ -210,6 +233,14 @@ export const useNests = () => {
             });
             toast({ title: "Member removed." });
         } catch (error: any) {
+             if (error.code?.includes('permission-denied')) {
+                 const permissionError = new FirestorePermissionError({
+                    path: `(transaction writes)`,
+                    operation: 'delete',
+                    requestResourceData: { member: memberRef.path, nest: nestRef.path, userStats: memberStatsRef.path },
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            }
              toast({ variant: 'destructive', title: 'Failed to kick member', description: error.message });
         } finally {
             setIsKicking(null);
@@ -227,6 +258,14 @@ export const useNests = () => {
             await updateDoc(memberRef, { role });
             toast({ title: "Role updated." });
         } catch (error: any) {
+            if (error.code?.includes('permission-denied')) {
+                 const permissionError = new FirestorePermissionError({
+                    path: memberRef.path,
+                    operation: 'update',
+                    requestResourceData: { role },
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            }
             toast({ variant: 'destructive', title: 'Failed to update role', description: error.message });
         } finally {
             setIsUpdatingRole(null);
