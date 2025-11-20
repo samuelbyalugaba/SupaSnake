@@ -38,8 +38,8 @@ export const useNests = () => {
 
     // --- Actions ---
     const createNest = useCallback(async (data: { name: string; motto: string; isPublic: boolean }, cost: number) => {
-        if (!user) {
-            toast({ variant: 'destructive', title: 'You must be logged in to create a Nest.' });
+        if (!user || !user.displayName) {
+            toast({ variant: 'destructive', title: 'You must be logged in and have a username to create a Nest.' });
             return;
         }
         if (!stats) {
@@ -57,8 +57,8 @@ export const useNests = () => {
 
         setIsCreating(true);
 
-        const nestNameRef = doc(db, 'nest-names', data.name.toLowerCase());
         const newNestRef = doc(collection(db, 'nests'));
+        const nestNameRef = doc(db, 'nest-names', data.name.toLowerCase());
         const userStatsRef = doc(db, `users/${user.uid}/stats/summary`);
         const nestMemberRef = doc(db, `nests/${newNestRef.id}/members`, user.uid);
         
@@ -71,34 +71,35 @@ export const useNests = () => {
                 
                 const userStatsDoc = await transaction.get(userStatsRef);
                 if (!userStatsDoc.exists() || (userStatsDoc.data().neonBits ?? 0) < cost) {
-                    throw new Error("Insufficient funds.");
+                    throw new Error("Insufficient funds. Please refresh and try again.");
                 }
 
-                // 1. Reserve the name
-                transaction.set(nestNameRef, { nestId: newNestRef.id });
-
-                // 2. Create the Nest document
+                // 1. Create the Nest document
                 transaction.set(newNestRef, {
                     name: data.name,
                     motto: data.motto,
                     isPublic: data.isPublic,
                     ownerId: user.uid,
                     memberCount: 1,
-                    totalScore: userStatsDoc.data().totalScore ?? 0,
-                    emblemId: 'default',
+                    totalScore: stats.totalScore ?? 0,
+                    emblemId: 'default', // Default emblem
                 });
 
-                // 3. Create the admin member document for the creator
+                // 2. Create the admin member document for the creator
                 transaction.set(nestMemberRef, {
                     userId: user.uid,
-                    username: user.displayName,
+                    username: user.displayName, // Ensure username is not null
                     role: 'admin',
                     joinedAt: serverTimestamp(),
                 });
+                
+                // 3. Reserve the unique Nest name
+                transaction.set(nestNameRef, { nestId: newNestRef.id });
 
                 // 4. Update user's stats (deduct cost and add nestId)
+                const newNeonBits = (userStatsDoc.data().neonBits ?? 0) - cost;
                 transaction.update(userStatsRef, {
-                    neonBits: (userStatsDoc.data().neonBits ?? 0) - cost,
+                    neonBits: newNeonBits,
                     nestId: newNestRef.id,
                 });
             });
@@ -113,7 +114,7 @@ export const useNests = () => {
     }, [user, db, stats, toast]);
     
     const joinNest = useCallback(async (nestId: string) => {
-        if (!user || !stats) {
+        if (!user || !stats || !user.displayName) {
             toast({ variant: 'destructive', title: 'You must be logged in to join a Nest.' });
             return;
         };
