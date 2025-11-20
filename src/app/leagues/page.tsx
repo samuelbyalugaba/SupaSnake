@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -154,10 +154,60 @@ const YourLeagueProfile = ({ user, stats, isLoading }: { user: any; stats: any; 
     )
 }
 
+const seasonNames = [
+    "Season of the Genesis", // Jan
+    "Season of the Glitch", // Feb
+    "Season of the Bloom", // Mar
+    "Season of the Fool", // Apr
+    "Season of the Surge", // May
+    "Season of the Solstice", // Jun
+    "Season of the Supernova", // Jul
+    "Season of the Harvest", // Aug
+    "Season of the Equinox", // Sep
+    "Season of the Phantom", // Oct
+    "Season of the Nexus", // Nov
+    "Season of the Singularity" // Dec
+];
+
+
 export default function LeaguesPage() {
   const { user, isUserLoading } = useUser();
   const { stats, isLoading: isStatsLoading } = useStats();
   const isLoading = isUserLoading || isStatsLoading;
+
+  const [seasonName, setSeasonName] = useState('');
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0 });
+
+  useEffect(() => {
+    const updateCountdown = () => {
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        // Set the season name
+        setSeasonName(seasonNames[currentMonth]);
+
+        // Calculate the end of the current month
+        const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
+
+        // Calculate time remaining
+        const totalSeconds = (endOfMonth.getTime() - now.getTime()) / 1000;
+
+        if (totalSeconds > 0) {
+            const days = Math.floor(totalSeconds / (3600 * 24));
+            const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            setTimeLeft({ days, hours, minutes });
+        } else {
+            setTimeLeft({ days: 0, hours: 0, minutes: 0 });
+        }
+    };
+
+    updateCountdown();
+    const intervalId = setInterval(updateCountdown, 60000); // Update every minute
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   const leaguePoints = stats?.leaguePoints ?? 0;
   const currentRank = getRankForPoints(leaguePoints);
@@ -182,8 +232,13 @@ export default function LeaguesPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <p className="text-lg font-bold">Season 1: Rise of the Serpent</p>
-            <p className="text-sm text-muted-foreground">12 days left</p>
+            <p className="text-lg font-bold">{seasonName}</p>
+            <p className="text-sm text-muted-foreground">
+              {timeLeft.days > 0 ? `${timeLeft.days}d ` : ''}
+              {timeLeft.hours > 0 ? `${timeLeft.hours}h ` : ''}
+              {timeLeft.minutes > 0 ? `${timeLeft.minutes}m ` : 'New season starting soon!'}
+              left
+            </p>
           </div>
           <Link href="/play">
             <Button size="lg" className="animate-pulse">Start Competing</Button>
@@ -263,3 +318,5 @@ export default function LeaguesPage() {
     </div>
   );
 }
+
+    
