@@ -243,7 +243,8 @@ const MemberManagementMenu = ({ member, self }: { member: NestMember, self?: Nes
 type MemberWithStats = NestMember & { totalScore?: number; leaguePoints?: number };
 
 const NestMembersTab = () => {
-    const { user, db } = useUser();
+    const { user } = useUser();
+    const db = useFirestore();
     const { nestMembers, isUserNestLoading, stats } = useNests();
     
     // Fetch detailed stats for all members in one go
@@ -259,9 +260,9 @@ const NestMembersTab = () => {
         
         setIsMemberStatsLoading(true);
         const memberIds = nestMembers.map(m => m.userId);
-        const statsQuery = query(collection(db, 'users'), where('__name__', 'in', memberIds));
         
         const getMemberStats = async () => {
+            if (!db) return;
             const memberDocs = await getDocs(query(collection(db, 'league-players'), where('userId', 'in', memberIds)));
             const playersData = new Map(memberDocs.docs.map(doc => [doc.id, doc.data() as leaguePlayer]));
             
@@ -279,7 +280,7 @@ const NestMembersTab = () => {
 
         getMemberStats();
 
-    }, [nestMembers, db]);
+    }, [nestMembers, db, stats?.totalScore]);
 
 
     if (isUserNestLoading || isMemberStatsLoading) {
