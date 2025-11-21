@@ -50,7 +50,7 @@ const navLinks = [
 
 const Logo = () => (
   <Link href="/" className="flex items-center gap-2" prefetch={false}>
-    <Image src="/icon.png" alt="Supa Snake Logo" width={24} height={24} className="w-6 h-6" />
+    <Image src="/icon.svg" alt="Supa Snake Logo" width={24} height={24} className="w-6 h-6" />
     <span 
       className="text-xl font-bold uppercase tracking-wider"
       style={{ filter: `drop-shadow(0 0 5px hsl(var(--primary)))` }}
