@@ -1,5 +1,5 @@
 
-import type {Metadata} from 'next';
+import type {Metadata, Viewport} from 'next';
 import { Toaster } from "@/components/ui/toaster";
 import './globals.css';
 import { Providers } from '@/components/providers';
@@ -14,12 +14,16 @@ import { CosmeticsProvider } from '@/context/CosmeticsContext';
 export const metadata: Metadata = {
   title: 'Supa Snake',
   description: 'A modern, responsive Snake game with a retro neon theme.',
-  manifest: '/manifest.json',
+  manifest: '/manifest.webmanifest',
   icons: {
     icon: '/icon.svg',
-    apple: '/icon.svg',
+    apple: '/apple-icon.png',
   }
 };
+
+export const viewport: Viewport = {
+  themeColor: '#000000',
+}
 
 const Footer = () => {
   return (
@@ -44,7 +48,6 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
-        <link rel="icon" href="/icon.svg" type="image/svg+xml" sizes="any" />
       </head>
       <body>
         <FirebaseClientProvider>
