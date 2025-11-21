@@ -88,11 +88,12 @@ export const useNests = () => {
                 };
                 transaction.set(newNestRef, nestData);
 
-                const memberData: Omit<NestMember, 'joinedAt'> & { joinedAt: any } = {
+                const memberData: Omit<NestMember, 'joinedAt' | 'id'> & { joinedAt: any } = {
                     userId: user.uid,
                     username: user.displayName!,
                     role: 'admin',
                     joinedAt: serverTimestamp(),
+                    leaguePoints: stats.leaguePoints ?? 0,
                 };
                 transaction.set(nestMemberRef, memberData);
                 
@@ -141,8 +142,15 @@ export const useNests = () => {
                 
                 const currentTotalScore = nestDoc.data().totalScore ?? 0;
                 const userTotalScore = stats.totalScore ?? 0;
-
-                transaction.set(nestMemberRef, { userId: user.uid, username: user.displayName, role: 'member', joinedAt: serverTimestamp() });
+                
+                const memberData = { 
+                    userId: user.uid, 
+                    username: user.displayName, 
+                    role: 'member', 
+                    joinedAt: serverTimestamp(),
+                    leaguePoints: stats.leaguePoints ?? 0,
+                };
+                transaction.set(nestMemberRef, memberData);
                 transaction.update(nestRef, { 
                     memberCount: (nestDoc.data().memberCount ?? 0) + 1,
                     totalScore: currentTotalScore + userTotalScore,

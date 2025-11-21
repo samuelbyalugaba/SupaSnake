@@ -27,7 +27,7 @@ export const useStats = () => {
         const bitsEarned = Math.floor(score / 5);
         const leaguePointsGained = Math.floor(score / 50) * 10;
         
-        const userStats = stats || { highScore: 0, gamesPlayed: 0, totalScore: 0, neonBits: 0, leaguePoints: 0, equippedCosmetic: 'default' };
+        const userStats = stats || { highScore: 0, gamesPlayed: 0, totalScore: 0, neonBits: 0, leaguePoints: 0, equippedCosmetic: 'default', nestId: null };
 
         const statsUpdatePayload = {
             highScore: Math.max(score, userStats.highScore),
@@ -45,6 +45,13 @@ export const useStats = () => {
             equippedCosmetic: userStats.equippedCosmetic
         };
         batch.set(leaguePlayerRef, leaguePlayerUpdatePayload, { merge: true });
+
+        // If user is in a nest, update their leaguePoints there too
+        if (userStats.nestId) {
+            const nestMemberRef = doc(db, `nests/${userStats.nestId}/members`, user.uid);
+            batch.update(nestMemberRef, { leaguePoints: increment(leaguePointsGained) });
+        }
+
 
         if (achievementsToSync.size > 0) {
             await syncAchievements(batch, achievementsToSync);

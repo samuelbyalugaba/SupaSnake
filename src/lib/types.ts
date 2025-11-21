@@ -100,10 +100,12 @@ export type Nest = {
 export type NestMemberRole = 'admin' | 'moderator' | 'member';
 
 export type NestMember = {
+    id: string; // The doc ID is the userId
     userId: string;
     username: string;
     role: NestMemberRole;
     joinedAt: Timestamp;
+    leaguePoints: number;
 };
 
 export type CreateNestRequest = {

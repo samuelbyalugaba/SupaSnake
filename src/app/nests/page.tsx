@@ -17,7 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import type { Nest, NestMember, NestMemberRole, leaguePlayer, UserStats, UpdateNestRequest } from '@/lib/types';
+import type { Nest, NestMember, NestMemberRole, UpdateNestRequest, NestJoinRequest } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { NestBanner, NEST_BANNERS } from '@/components/game/NestBanner';
@@ -276,65 +276,16 @@ const MemberManagementMenu = ({ member, self }: { member: NestMember, self?: Nes
     );
 };
 
-type MemberWithStats = NestMember & { totalScore?: number; leaguePoints?: number };
-
 const NestMembersTab = () => {
     const { user } = useUser();
-    const db = useFirestore();
-    const { nestMembers, isUserNestLoading, stats } = useNests();
+    const { nestMembers, isUserNestLoading } = useNests();
     
-    // Fetch detailed stats for all members in one go
-    const [membersWithStats, setMembersWithStats] = useState<MemberWithStats[]>([]);
-    const [isMemberStatsLoading, setIsMemberStatsLoading] = useState(true);
-
-    React.useEffect(() => {
-        if (!nestMembers || nestMembers.length === 0) {
-            setMembersWithStats([]);
-            setIsMemberStatsLoading(false);
-            return;
-        };
-        
-        setIsMemberStatsLoading(true);
-        const memberIds = nestMembers.map(m => m.userId);
-        
-        const getMemberStats = async () => {
-            if (!db) return;
-            // Limit the 'in' query to 10 members at a time, as per Firestore limits
-            const memberChunks: string[][] = [];
-            for (let i = 0; i < memberIds.length; i += 10) {
-                memberChunks.push(memberIds.slice(i, i + 10));
-            }
-
-            const playersData = new Map<string, leaguePlayer>();
-            for(const chunk of memberChunks) {
-                const memberDocs = await getDocs(query(collection(db, 'league-players'), where('userId', 'in', chunk)));
-                memberDocs.docs.forEach(doc => {
-                    playersData.set(doc.id, doc.data() as leaguePlayer);
-                });
-            }
-            
-            const detailedMembers = nestMembers.map(member => {
-                const playerData = playersData.get(member.userId);
-                return {
-                    ...member,
-                    leaguePoints: playerData?.leaguePoints ?? 0,
-                };
-            });
-            setMembersWithStats(detailedMembers);
-            setIsMemberStatsLoading(false);
-        }
-
-        getMemberStats();
-
-    }, [nestMembers, db]);
-
-
-    if (isUserNestLoading || isMemberStatsLoading) {
+    if (isUserNestLoading) {
          return <div className="space-y-2">{Array.from({length: 4}).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
     }
 
     const self = nestMembers.find(m => m.userId === user?.uid);
-    const sortedMembers = [...membersWithStats].sort((a, b) => {
+    const sortedMembers = [...nestMembers].sort((a, b) => {
         const roleOrder = { admin: 0, moderator: 1, member: 2 };
         if (roleOrder[a.role] !== roleOrder[b.role]) {
             return roleOrder[a.role] - roleOrder[b.role];
