@@ -412,7 +412,6 @@ const NestSettingsTab = () => {
 
 
 const UserNest = () => {
-    const { user } = useUser();
     const { userNest, isUserNestLoading, leaveNest, isLeaving } = useNests();
     
     if (isUserNestLoading || !userNest) return <Skeleton className="h-96 w-full" />;
@@ -521,3 +520,5 @@ export default function NestsPage() {
         </div>
     );
 }
+
+    

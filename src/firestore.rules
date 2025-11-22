@@ -141,13 +141,20 @@ service cloud.firestore {
         allow update, delete: if false;
     }
     
+    // Rules for Direct Messages
     match /dms/{channelId}/messages/{messageId} {
         // Users can only read/write to DM channels they are a part of.
         // This assumes the channelId is structured like `userId1_userId2`
-        allow read, create: if isAuthenticated() && request.auth.uid in channelId.split('_');
+        allow read, list, create: if isAuthenticated() && request.auth.uid in channelId.split('_')
+                           && request.resource.data.userId == request.auth.uid
+                           && request.resource.data.text is string
+                           && request.resource.data.text.size() > 0
+                           && request.resource.data.text.size() < 300;
         allow update, delete: if false;
     }
 
     // No other collections are publicly accessible by default.
   }
 }
+
+    

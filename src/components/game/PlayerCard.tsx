@@ -1,17 +1,20 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { leaguePlayer } from '@/lib/types';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { User as UserIcon, Crown, Shield, Swords, PlusCircle } from 'lucide-react';
+import { User as UserIcon, Crown, Shield, Swords, PlusCircle, MessageSquare } from 'lucide-react';
 import SnakePreview from './SnakePreview';
 import { ALL_COSMETICS } from '@/lib/cosmetics';
 import { Button } from '../ui/button';
 import { useNests } from '@/hooks/use-nests';
 import { NestBanner } from './NestBanner';
 import { Skeleton } from '../ui/skeleton';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import GlobalChat from './GlobalChat';
+import { useUser } from '@/firebase';
 
 const rankTiers = [
   { name: 'Serpent King', icon: Crown, color: 'text-yellow-400', minPoints: 10000 },
@@ -24,7 +27,9 @@ const getRankForPoints = (points: number) => {
 }
 
 const PlayerCard = ({ player }: { player: leaguePlayer }) => {
+    const { user } = useUser();
     const { allNests, isLoading: isNestsLoading } = useNests();
+    const [isChatOpen, setIsChatOpen] = useState(false);
     
     const cosmetic = useMemo(() => {
         return ALL_COSMETICS.find(c => c.id === player.equippedCosmetic) || ALL_COSMETICS[0];
@@ -32,14 +37,19 @@ const PlayerCard = ({ player }: { player: leaguePlayer }) => {
 
     const rank = getRankForPoints(player.leaguePoints);
     
-    // This is not efficient, but it's for display purposes.
-    // A better implementation would have nest details denormalized on the player object.
     const nest = useMemo(() => {
         if (!player.nestId || isNestsLoading || !allNests) return null;
         return allNests.find(n => n.id === player.nestId);
     }, [player.nestId, allNests, isNestsLoading]);
 
+    const handleMessageClick = () => {
+        if (user && user.uid !== player.userId) {
+            setIsChatOpen(true);
+        }
+    }
+
     return (
+        <>
         <Card className="bg-card/50 border-primary/20 flex flex-col justify-between">
             <CardHeader className="flex-row gap-4 items-center">
                  <Avatar className="w-12 h-12 border-2 border-primary">
@@ -73,13 +83,30 @@ const PlayerCard = ({ player }: { player: leaguePlayer }) => {
                     )}
                 </div>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="grid grid-cols-2 gap-2">
                 <Button variant="outline" className="w-full">
                     <PlusCircle className="mr-2" /> Add Friend
                 </Button>
+                <Button variant="outline" className="w-full" onClick={handleMessageClick} disabled={!user || user.uid === player.userId}>
+                    <MessageSquare className="mr-2" /> Message
+                </Button>
             </CardFooter>
         </Card>
+        <Sheet open={isChatOpen} onOpenChange={setIsChatOpen}>
+            <SheetContent side="bottom" className="h-[400px] flex flex-col">
+                <SheetHeader>
+                    <SheetTitle>Chat</SheetTitle>
+                    <SheetDescription className="sr-only">
+                        Private message with {player.username}.
+                    </SheetDescription>
+                </SheetHeader>
+                <GlobalChat defaultTab="dms" defaultDmUser={player} />
+            </SheetContent>
+        </Sheet>
+        </>
     );
 };
 
 export default PlayerCard;
+
+    
