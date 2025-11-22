@@ -42,7 +42,8 @@ export const useStats = () => {
         const leaguePlayerUpdatePayload = {
             leaguePoints: increment(leaguePointsGained),
             username: user.displayName,
-            equippedCosmetic: userStats.equippedCosmetic
+            equippedCosmetic: userStats.equippedCosmetic,
+            nestId: userStats.nestId, // Keep nestId in sync
         };
         batch.set(leaguePlayerRef, leaguePlayerUpdatePayload, { merge: true });
 

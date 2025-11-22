@@ -28,6 +28,7 @@ import {
   Sparkles,
   Swords,
   Shield,
+  Users,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ const navLinks = [
   { href: "/", label: "Home", icon: Home },
   { href: "/play", label: "Play", icon: Gamepad2 },
   { href: "/nests", label: "Nests", icon: Swords },
+  { href: "/friends", label: "Friends", icon: Users },
   { href: "/leaderboards", label: "Leaderboards", icon: BarChart },
   { href: "/achievements", label: "Achievements", icon: Trophy },
   { href: "/cosmetics", label: "Cosmetics", icon: Sparkles },
@@ -207,5 +209,3 @@ export default function Navbar() {
     </div>
   );
 }
-
-    
