@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp, query, orderBy, limit, getDocs, Timestamp, writeBatch, doc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, query, orderBy, limit, getDocs, Timestamp, writeBatch, doc, where } from 'firebase/firestore';
 import { Send, MessageSquare, Users, Mail, ArrowLeft, Search } from 'lucide-react';
 import type { Message, leaguePlayer } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
@@ -89,6 +89,10 @@ const DMList = ({ onSelectUser, activeDmUser }: { onSelectUser: (user: leaguePla
                 return;
             }
             const userIds = conversationsData.map(c => c.userId);
+            if (userIds.length === 0) { // Add this check
+                setConversations([]);
+                return;
+            }
             const playersRef = collection(db, 'league-players');
             const playersQuery = query(playersRef, where('userId', 'in', userIds));
             const playerSnapshots = await getDocs(playersQuery);
@@ -113,7 +117,7 @@ const DMList = ({ onSelectUser, activeDmUser }: { onSelectUser: (user: leaguePla
             <div className="text-center p-4 text-muted-foreground text-sm flex flex-col items-center justify-center gap-4 h-full">
                 <p>Find a player and send them a message!</p>
                 <Link href="/friends" passHref>
-                    <Button variant="outline"><Search className="mr-2"/> Find Players</Button>
+                    <Button variant="outline"><Search className="w-4 h-4 mr-2"/> Find Players</Button>
                 </Link>
             </div>
         );
@@ -241,12 +245,18 @@ const GlobalChat = ({ defaultTab = 'global', defaultDmUser }: { defaultTab?: Cha
     return null;
   }
 
-  const isSendDisabled = isSending || !input.trim() || (activeTab === 'nest' && !nestId) || (activeTab === 'dms' && !activeDmUser);
-
   const getPlaceholder = () => {
     if (isSending) return "Sending...";
-    if (activeTab === 'dms' && !activeDmUser) return "Select a conversation to start";
-    if (activeTab === 'nest' && !nestId) return "Join a Nest to chat";
+    
+    if (activeTab === 'dms') {
+        if (!activeDmUser) return "Select a conversation to start";
+        return `Message ${activeDmUser.username}...`;
+    }
+
+    if (activeTab === 'nest' && !nestId) {
+        return "Join a Nest to chat";
+    }
+    
     return "Say something...";
   };
   
