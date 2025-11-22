@@ -73,7 +73,8 @@
         "userId": { "type": "string", "description": "The UID of the user." },
         "username": { "type": "string", "description": "The display name of the user." },
         "role": { "type": "string", "enum": ["admin", "moderator", "member"], "description": "The role of the user in the Nest." },
-        "joinedAt": { "type": "string", "format": "date-time", "description": "The timestamp when the user joined." }
+        "joinedAt": { "type": "string", "format": "date-time", "description": "The timestamp when the user joined." },
+        "leaguePoints": { "type": "number", "description": "The league points of the member, denormalized for sorting." }
       },
       "required": ["userId", "username", "role", "joinedAt"]
     },
@@ -175,3 +176,5 @@
     }
   }
 }
+
+    

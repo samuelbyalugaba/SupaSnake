@@ -79,3 +79,5 @@ export const useStats = () => {
 
     return { stats, isLoading, updateStatsAndAchievements };
 };
+
+    

@@ -129,3 +129,5 @@ export type NestJoinRequest = {
     status: 'pending' | 'approved' | 'rejected';
     requestedAt: Timestamp;
 };
+
+    

@@ -167,3 +167,5 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ open, onOpenChange }) => {
 };
 
 export default AuthDialog;
+
+    
