@@ -42,6 +42,7 @@ export const useStats = () => {
         const leaguePlayerUpdatePayload = {
             leaguePoints: increment(leaguePointsGained),
             username: user.displayName,
+            // Use the actual equipped cosmetic from the stats, not a default
             equippedCosmetic: userStats.equippedCosmetic,
             nestId: userStats.nestId, // Keep nestId in sync
         };
