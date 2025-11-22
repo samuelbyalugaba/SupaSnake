@@ -52,9 +52,16 @@ export const useCosmetics = () => {
             return;
         }
 
+        const batch = writeBatch(db);
         const statsRef = doc(db, `users/${user.uid}/stats/summary`);
+        batch.update(statsRef, { equippedCosmetic: cosmeticId });
+
+        // Also update the public league player document
+        const leaguePlayerRef = doc(db, `league-players/${user.uid}`);
+        batch.update(leaguePlayerRef, { equippedCosmetic: cosmeticId });
+
         try {
-            await updateDoc(statsRef, { equippedCosmetic: cosmeticId });
+            await batch.commit();
             toast({
                 title: "Cosmetic Equipped!",
                 description: "Your new look is ready for the grid.",
