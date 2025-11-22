@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { useMemo, useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import AchievementCard from "@/components/game/AchievementCard";
-import { collection, query, where, getDocs, limit, doc } from "firebase/firestore";
+import { collection, query, where, getDocs, limit, doc, getDoc } from "firebase/firestore";
 import type { UserStats, AchievementWithProgress, UserAchievement, leaguePlayer } from "@/lib/types";
 import { ALL_ACHIEVEMENTS } from "@/lib/achievements";
 import { ALL_COSMETICS } from "@/lib/cosmetics";
@@ -23,7 +23,6 @@ export default function PublicProfilePage({ params }: { params: { username: stri
   const db = useFirestore();
   const [profileUser, setProfileUser] = useState<leaguePlayer | null>(null);
   const [profileStats, setProfileStats] = useState<UserStats | null>(null);
-  const [profileAchievements, setProfileAchievements] = useState<AchievementWithProgress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const { allNests, isLoading: isNestsLoading } = useNests();
@@ -53,22 +52,6 @@ export default function PublicProfilePage({ params }: { params: { username: stri
         const statsData = statsSnap.exists() ? statsSnap.data() as UserStats : null;
         setProfileStats(statsData);
 
-        // 3. Fetch achievements
-        const achievementsRef = collection(db, `users/${userId}/achievements`);
-        const achievementsSnap = await getDocs(achievementsRef);
-        const userAchievementsData = achievementsSnap.docs.map(d => d.data() as UserAchievement);
-        
-        const combined = ALL_ACHIEVEMENTS.map(staticAch => {
-          const userProgress = userAchievementsData.find(ua => ua.id === staticAch.id);
-          return {
-            ...staticAch,
-            isUnlocked: userProgress?.isUnlocked || false,
-            progress: userProgress?.progress || 0,
-            unlockedAt: userProgress?.unlockedAt,
-          };
-        });
-        setProfileAchievements(combined);
-
       } catch (error) {
         console.error("Error fetching user profile:", error);
       } finally {
@@ -79,26 +62,6 @@ export default function PublicProfilePage({ params }: { params: { username: stri
     fetchUserData();
   }, [params.username, db]);
 
-
-  const { unlockedCount, totalCount, achievementProgress, recentAchievements } = useMemo(() => {
-    if (!profileAchievements) return { unlockedCount: 0, totalCount: 0, achievementProgress: 0, recentAchievements: [] };
-    
-    const unlocked = profileAchievements.filter(a => a.isUnlocked);
-    const total = ALL_ACHIEVEMENTS.length;
-    const progress = total > 0 ? (unlocked.length / total) * 100 : 0;
-    
-    const recent = unlocked
-      .filter(a => a.unlockedAt)
-      .sort((a, b) => b.unlockedAt!.toMillis() - a.unlockedAt!.toMillis())
-      .slice(0, 3);
-      
-    return { 
-      unlockedCount: unlocked.length, 
-      totalCount: total, 
-      achievementProgress: progress,
-      recentAchievements: recent
-    };
-  }, [profileAchievements]);
 
   const cosmetic = useMemo(() => {
     if (!profileStats) return ALL_COSMETICS[0];
@@ -148,8 +111,8 @@ export default function PublicProfilePage({ params }: { params: { username: stri
         </CardHeader>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
             {/* Game Statistics */}
             <Card className="bg-card/50 border-primary/20">
                 <CardHeader>
@@ -170,13 +133,6 @@ export default function PublicProfilePage({ params }: { params: { username: stri
                             {isLoading ? <Skeleton className="h-7 w-24" /> : <p className="text-xl font-bold">{profileStats?.gamesPlayed ?? 0}</p>}
                         </div>
                     </div>
-                    <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-lg">
-                        <Gem className="w-6 h-6 text-primary"/>
-                        <div>
-                            <p className="text-sm text-muted-foreground">Neon Bits</p>
-                            {isLoading ? <Skeleton className="h-7 w-24" /> : <p className="text-xl font-bold">{profileStats?.neonBits ?? 0}</p>}
-                        </div>
-                    </div>
                 </CardContent>
             </Card>
 
@@ -194,54 +150,22 @@ export default function PublicProfilePage({ params }: { params: { username: stri
                     </div>
                 </CardContent>
              </Card>
-
-              {/* Nest */}
-              <Card className="bg-card/50 border-primary/20">
-                <CardHeader>
-                    <CardTitle>Nest</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {isNestsLoading ? (
-                        <Skeleton className="w-full h-24" />
-                    ) : nest ? (
-                        <NestBanner nest={nest} />
-                    ) : (
-                        <p className="text-sm text-muted-foreground text-center p-4">Not a member of any Nest.</p>
-                    )}
-                </CardContent>
-              </Card>
-
         </div>
 
-        {/* Achievements */}
-        <Card className="lg:col-span-2 bg-card/50 border-primary/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Trophy/> Achievements</CardTitle>
-            <CardDescription>
-              {isLoading ? 'Loading...' : `${unlockedCount} of ${totalCount} unlocked`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-             <Progress value={achievementProgress} className="mb-4 h-2" />
-              <div>
-                <h4 className="font-semibold mb-3">Recent Unlocks</h4>
-                 {isLoading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <Skeleton className="h-24"/>
-                        <Skeleton className="h-24"/>
-                        <Skeleton className="h-24"/>
-                    </div>
-                ) : recentAchievements.length > 0 ? (
-                    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 xl:grid-cols-3">
-                        {recentAchievements.map(ach => <AchievementCard key={ach.id} achievement={ach}/>)}
-                    </div>
-                ) : (
-                    <p className="text-sm text-muted-foreground text-center p-4">
-                        Play some games to unlock achievements!
-                    </p>
-                )}
-              </div>
-          </CardContent>
+        {/* Nest */}
+        <Card className="bg-card/50 border-primary/20">
+        <CardHeader>
+            <CardTitle>Nest</CardTitle>
+        </CardHeader>
+        <CardContent>
+            {isNestsLoading ? (
+                <Skeleton className="w-full h-24" />
+            ) : nest ? (
+                <NestBanner nest={nest} />
+            ) : (
+                <p className="text-sm text-muted-foreground text-center p-4">Not a member of any Nest.</p>
+            )}
+        </CardContent>
         </Card>
       </div>
     </div>
