@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState } from 'react';
@@ -36,7 +37,7 @@ const PlayerCard = ({ player }: { player: leaguePlayer }) => {
         return ALL_COSMETICS.find(c => c.id === player.equippedCosmetic) || ALL_COSMETICS[0];
     }, [player.equippedCosmetic]);
 
-    const rank = getRankForPoints(player.leaguePoints);
+    const rank = getRankForPoints(player.leaguePoints || 0);
     
     const nest = useMemo(() => {
         if (!player.nestId || isNestsLoading || !allNests) return null;
@@ -81,7 +82,7 @@ const PlayerCard = ({ player }: { player: leaguePlayer }) => {
                     <h3 className="text-xl font-bold">{player.username}</h3>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         {rank && <rank.icon className={`w-4 h-4 ${rank.color}`} />}
-                        <span>{player.leaguePoints.toLocaleString()} LP</span>
+                        <span>{(player.leaguePoints || 0).toLocaleString()} LP</span>
                     </div>
                 </div>
             </CardHeader>
