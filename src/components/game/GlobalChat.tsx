@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp, query, orderBy, limit, getDocs, Timestamp, writeBatch } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, query, orderBy, limit, getDocs, Timestamp, writeBatch, doc } from 'firebase/firestore';
 import { Send, MessageSquare, Users, Mail, ArrowLeft, Search } from 'lucide-react';
 import type { Message, leaguePlayer } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
@@ -47,7 +47,7 @@ const ChatMessages = ({ messages, isLoading, currentUserId }: { messages: Messag
         return <div className="text-center text-muted-foreground text-sm flex items-center justify-center h-full">No messages yet. Say hello!</div>;
     }
     
-    const orderedMessages = [...messages].reverse();
+    const orderedMessages = [...messages].sort((a,b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
 
     return (
         <ScrollArea className="h-full pr-4" ref={scrollAreaRef}>
@@ -111,7 +111,7 @@ const DMList = ({ onSelectUser, activeDmUser }: { onSelectUser: (user: leaguePla
     if (conversations.length === 0) {
         return (
             <div className="text-center p-4 text-muted-foreground text-sm flex flex-col items-center justify-center gap-4 h-full">
-                <p>No conversations yet. Find a player and send them a message!</p>
+                <p>Find a player and send them a message!</p>
                 <Link href="/friends" passHref>
                     <Button variant="outline"><Search className="mr-2"/> Find Players</Button>
                 </Link>
@@ -168,26 +168,25 @@ const GlobalChat = ({ defaultTab = 'global', defaultDmUser }: { defaultTab?: Cha
   
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !input.trim() || isSending) return;
+    if (!user || !input.trim() || isSending || !user.displayName) return;
 
     setIsSending(true);
     const messageText = input;
     setInput('');
     
-    let targetCollection: any;
+    let targetCollectionRef: any;
     let messagePayload: any = { text: messageText, userId: user.uid, username: user.displayName, timestamp: serverTimestamp() };
 
     const batch = writeBatch(db);
 
     if (activeTab === 'global') {
-        targetCollection = globalMessagesRef;
+        targetCollectionRef = globalMessagesRef;
     } else if (activeTab === 'nest' && nestMessagesRef) {
-        targetCollection = nestMessagesRef;
+        targetCollectionRef = nestMessagesRef;
     } else if (activeTab === 'dms' && dmRef && activeDmUser) {
-        targetCollection = dmRef;
+        targetCollectionRef = dmRef;
         const now = serverTimestamp();
         
-        // Create conversation pointer for sender
         const senderConvRef = doc(db, `users/${user.uid}/conversations`, activeDmUser.userId);
         batch.set(senderConvRef, {
             userId: activeDmUser.userId,
@@ -195,7 +194,6 @@ const GlobalChat = ({ defaultTab = 'global', defaultDmUser }: { defaultTab?: Cha
             lastMessageAt: now,
         }, { merge: true });
 
-        // Create conversation pointer for receiver
         const receiverConvRef = doc(db, `users/${activeDmUser.userId}/conversations`, user.uid);
         batch.set(receiverConvRef, {
             userId: user.uid,
@@ -209,8 +207,8 @@ const GlobalChat = ({ defaultTab = 'global', defaultDmUser }: { defaultTab?: Cha
         return;
     }
     
-    const messageRef = doc(collection(db, targetCollection.path));
-    batch.set(messageRef, messagePayload);
+    const newMessageRef = doc(targetCollectionRef);
+    batch.set(newMessageRef, messagePayload);
 
     try {
       await batch.commit();
@@ -245,6 +243,13 @@ const GlobalChat = ({ defaultTab = 'global', defaultDmUser }: { defaultTab?: Cha
 
   const isSendDisabled = isSending || !input.trim() || (activeTab === 'nest' && !nestId) || (activeTab === 'dms' && !activeDmUser);
 
+  const getPlaceholder = () => {
+    if (isSending) return "Sending...";
+    if (activeTab === 'dms' && !activeDmUser) return "Select a conversation to start";
+    if (activeTab === 'nest' && !nestId) return "Join a Nest to chat";
+    return "Say something...";
+  };
+  
   if (!user) return null;
 
   return (
@@ -272,11 +277,11 @@ const GlobalChat = ({ defaultTab = 'global', defaultDmUser }: { defaultTab?: Cha
             <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={isSendDisabled ? "Select a conversation to start" : "Say something..."}
-                disabled={isSendDisabled || isSending}
+                placeholder={getPlaceholder()}
+                disabled={isSending || (activeTab === 'dms' && !activeDmUser) || (activeTab === 'nest' && !nestId)}
                 autoComplete="off"
             />
-            <Button type="submit" size="icon" disabled={isSendDisabled}>
+            <Button type="submit" size="icon" disabled={isSending || !input.trim() || (activeTab === 'dms' && !activeDmUser) || (activeTab === 'nest' && !nestId)}>
                 <Send />
             </Button>
         </form>
