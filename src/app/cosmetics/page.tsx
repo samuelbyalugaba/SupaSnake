@@ -23,30 +23,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import type { Cosmetic, CosmeticRarity } from '@/lib/types';
 import { useAchievements } from '@/context/AchievementContext';
-
-const SnakePreview = ({ cosmetic }: { cosmetic: Cosmetic }) => {
-    const segments = [{x: 0, y: 0}, {x: 1, y: 0}, {x: 2, y: 0}];
-    const cellSize = 12;
-    return (
-        <div className="flex p-2 rounded-md bg-black/30">
-            {segments.map((seg, i) => (
-                 <div
-                    key={i}
-                    style={{
-                        width: `${cellSize * 2}px`,
-                        height: `${cellSize * 2}px`,
-                        borderRadius: '50%',
-                        background: i === 0 
-                            ? `radial-gradient(circle, ${cosmetic.style.headGradient.from}, ${cosmetic.style.headGradient.to})`
-                            : `radial-gradient(circle, ${cosmetic.style.bodyGradient.from}, ${cosmetic.style.bodyGradient.to})`,
-                        boxShadow: `0 0 8px ${cosmetic.style.shadow}`,
-                        transform: `translateX(-${i * (cellSize / 2)}px)`
-                    }}
-                 />
-            ))}
-        </div>
-    );
-};
+import SnakePreview from '@/components/game/SnakePreview';
 
 const CosmeticCard = ({ cosmetic }: { cosmetic: Cosmetic }) => {
     const { equippedCosmetic, equipCosmetic, purchaseCosmetic, isPurchasing, isCosmeticUnlocked } = useCosmetics();

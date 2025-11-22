@@ -14,6 +14,8 @@ import type { leaguePlayer } from '@/lib/types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { User as UserIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ALL_COSMETICS } from '@/lib/cosmetics';
+import SnakePreview from '@/components/game/SnakePreview';
 
 const NestLeaderboard = () => {
     const { allNests, isLoading } = useNests();
@@ -87,7 +89,7 @@ const PlayerLeaderboard = () => {
     if (isLoading) {
         return (
             <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+                {Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
             </div>
         );
     }
@@ -111,24 +113,31 @@ const PlayerLeaderboard = () => {
                         <TableRow>
                             <TableHead className="w-[50px]">Rank</TableHead>
                             <TableHead>Player</TableHead>
+                            <TableHead>Skin</TableHead>
                             <TableHead className="text-right">League Points</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {players.map((player, index) => (
-                            <TableRow key={player.userId || index} className={cn(player.userId === user?.uid && "bg-primary/10")}>
-                                <TableCell className="font-bold text-lg">{index + 1}</TableCell>
-                                <TableCell>
-                                    <div className="flex items-center gap-3">
-                                         <Avatar className="w-8 h-8 border-2 border-primary/50">
-                                            <AvatarFallback className="text-xs bg-muted">{player.username?.charAt(0) ?? <UserIcon />}</AvatarFallback>
-                                        </Avatar>
-                                        <span className="font-semibold">{player.username}</span>
-                                    </div>
-                                </TableCell>
-                                <TableCell className="text-right font-bold text-primary">{player.leaguePoints.toLocaleString()}</TableCell>
-                            </TableRow>
-                        ))}
+                        {players.map((player, index) => {
+                             const cosmetic = ALL_COSMETICS.find(c => c.id === player.equippedCosmetic) || ALL_COSMETICS[0];
+                             return (
+                                <TableRow key={player.userId || index} className={cn(player.userId === user?.uid && "bg-primary/10")}>
+                                    <TableCell className="font-bold text-lg">{index + 1}</TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-3">
+                                             <Avatar className="w-8 h-8 border-2 border-primary/50">
+                                                <AvatarFallback className="text-xs bg-muted">{player.username?.charAt(0) ?? <UserIcon />}</AvatarFallback>
+                                            </Avatar>
+                                            <span className="font-semibold">{player.username}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <SnakePreview cosmetic={cosmetic} segments={3} cellSize={8} />
+                                    </TableCell>
+                                    <TableCell className="text-right font-bold text-primary">{player.leaguePoints.toLocaleString()}</TableCell>
+                                </TableRow>
+                             )
+                        })}
                     </TableBody>
                 </Table>
             </CardContent>

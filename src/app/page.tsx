@@ -18,6 +18,7 @@ import { useCosmetics } from '@/context/CosmeticsContext';
 import { ALL_COSMETICS } from '@/lib/cosmetics';
 import type { Cosmetic } from '@/lib/types';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import SnakePreview from '@/components/game/SnakePreview';
 
 const HeroSection = () => (
   <div className="relative text-center py-16 md:py-24 overflow-hidden">
@@ -46,31 +47,6 @@ const HeroSection = () => (
     </div>
   </div>
 );
-
-const SnakePreview = ({ cosmetic, segments = 3 }: { cosmetic: Cosmetic, segments?: number }) => {
-    const segmentArr = Array.from({ length: segments });
-    const cellSize = 12;
-    return (
-        <div className="flex p-2 rounded-md bg-black/30">
-            {segmentArr.map((_, i) => (
-                 <div
-                    key={i}
-                    style={{
-                        width: `${cellSize * 2}px`,
-                        height: `${cellSize * 2}px`,
-                        borderRadius: '50%',
-                        background: i === 0 
-                            ? `radial-gradient(circle, ${cosmetic.style.headGradient.from}, ${cosmetic.style.headGradient.to})`
-                            : `radial-gradient(circle, ${cosmetic.style.bodyGradient.from}, ${cosmetic.style.bodyGradient.to})`,
-                        boxShadow: `0 0 8px ${cosmetic.style.shadow}`,
-                        transform: `translateX(-${i * (cellSize / 2)}px)`
-                    }}
-                 />
-            ))}
-        </div>
-    );
-};
-
 
 const PlayerHub = () => {
     const { user, isUserLoading } = useUser();
