@@ -131,3 +131,10 @@ export type NestJoinRequest = {
     status: 'pending' | 'approved' | 'rejected';
     requestedAt: Timestamp;
 };
+
+export type Conversation = {
+    id: string; // docId is the other user's UID
+    userId: string;
+    username: string;
+    lastMessageAt: Timestamp;
+}

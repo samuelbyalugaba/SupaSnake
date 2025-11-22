@@ -34,6 +34,7 @@ service cloud.firestore {
     
     // Other user-specific sub-collections (achievements, cosmetics)
     match /users/{userId}/{collection}/{docId} {
+      // Allow user to manage their own conversations list
       allow read, write: if isOwner(userId);
     }
 
@@ -156,5 +157,4 @@ service cloud.firestore {
     // No other collections are publicly accessible by default.
   }
 }
-
     

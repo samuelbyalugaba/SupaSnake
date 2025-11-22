@@ -104,6 +104,17 @@
       },
       "required": ["userId", "username", "text", "timestamp"]
     },
+    "conversation": {
+        "title": "Conversation Pointer",
+        "description": "A document indicating that a user has a conversation with another user.",
+        "type": "object",
+        "properties": {
+            "userId": { "type": "string" },
+            "username": { "type": "string" },
+            "lastMessageAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["userId", "username", "lastMessageAt"]
+    },
     "username": {
       "title": "Username",
       "description": "A registry document to ensure username uniqueness. The document ID is the lowercase username.",
@@ -138,6 +149,10 @@
     "/users/{userId}/cosmetics/{cosmeticId}": {
       "schema": { "$ref": "#/entities/cosmetic" },
       "description": "Stores the cosmetic items a user has unlocked."
+    },
+     "/users/{userId}/conversations/{otherUserId}": {
+      "schema": { "$ref": "#/entities/conversation" },
+      "description": "A list of users that the parent user has DM conversations with."
     },
     "/usernames/{username}": {
       "schema": { "$ref": "#/entities/username" },

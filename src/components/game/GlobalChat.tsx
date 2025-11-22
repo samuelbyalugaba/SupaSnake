@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp, query, orderBy, limit, collectionGroup, where, getDocs, Timestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, query, orderBy, limit, getDocs, Timestamp, writeBatch } from 'firebase/firestore';
 import { Send, MessageSquare, Users, Mail, ArrowLeft } from 'lucide-react';
 import type { Message, leaguePlayer } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
@@ -70,39 +70,38 @@ const ChatMessages = ({ messages, isLoading, currentUserId }: { messages: Messag
 const DMList = ({ onSelectUser, activeDmUser }: { onSelectUser: (user: leaguePlayer) => void; activeDmUser: leaguePlayer | null; }) => {
     const { user } = useUser();
     const db = useFirestore();
+
+    const conversationsQuery = useMemoFirebase(() =>
+        user ? query(collection(db, `users/${user.uid}/conversations`), orderBy('lastMessageAt', 'desc')) : null
+    , [db, user]);
+
+    const { data: conversationsData, isLoading } = useCollection<any>(conversationsQuery);
+    
     const [conversations, setConversations] = useState<leaguePlayer[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-
+    
     useEffect(() => {
-        if (!user) return;
-
-        const fetchConversations = async () => {
-            setIsLoading(true);
-            const dmsQuery = query(collectionGroup(db, 'messages'), where('userIds', 'array-contains', user.uid));
-            const querySnapshot = await getDocs(dmsQuery);
-            
-            const userIds = new Set<string>();
-            querySnapshot.forEach(doc => {
-                const data = doc.data();
-                data.userIds.forEach((uid: string) => {
-                    if (uid !== user.uid) {
-                        userIds.add(uid);
-                    }
-                });
-            });
-
-            if (userIds.size > 0) {
-                const playersRef = collection(db, 'league-players');
-                const playersQuery = query(playersRef, where('userId', 'in', Array.from(userIds)));
-                const playersSnapshot = await getDocs(playersQuery);
-                const players = playersSnapshot.docs.map(doc => doc.data() as leaguePlayer);
-                setConversations(players);
+        if (!conversationsData) return;
+    
+        const fetchPlayerInfo = async () => {
+            if (conversationsData.length === 0) {
+                setConversations([]);
+                return;
             }
-            setIsLoading(false);
-        };
+            const userIds = conversationsData.map(c => c.userId);
+            const playersRef = collection(db, 'league-players');
+            const playersQuery = query(playersRef, where('userId', 'in', userIds));
+            const playerSnapshots = await getDocs(playersQuery);
+            const playersMap = new Map(playerSnapshots.docs.map(doc => [doc.id, doc.data() as leaguePlayer]));
+            
+            const fullConversations = conversationsData
+                .map(conv => playersMap.get(conv.userId))
+                .filter((p): p is leaguePlayer => p !== undefined);
 
-        fetchConversations();
-    }, [user, db]);
+            setConversations(fullConversations);
+        };
+        fetchPlayerInfo();
+    }, [conversationsData, db]);
+
 
     if (isLoading) {
         return <div className="space-y-2">{Array.from({length: 3}).map((_, i) => <Skeleton key={i} className="h-12 w-full"/>)}</div>
@@ -166,25 +165,47 @@ const GlobalChat = ({ defaultTab = 'global', defaultDmUser }: { defaultTab?: Cha
     setIsSending(true);
     const messageText = input;
     setInput('');
+    
+    let targetCollection: any;
+    let messagePayload: any = { text: messageText, userId: user.uid, username: user.displayName, timestamp: serverTimestamp() };
 
-    let targetRef, payload;
+    const batch = writeBatch(db);
+
     if (activeTab === 'global') {
-        targetRef = globalMessagesRef;
-        payload = { text: messageText, userId: user.uid, username: user.displayName, timestamp: serverTimestamp() };
+        targetCollection = globalMessagesRef;
     } else if (activeTab === 'nest' && nestMessagesRef) {
-        targetRef = nestMessagesRef;
-        payload = { text: messageText, userId: user.uid, username: user.displayName, timestamp: serverTimestamp() };
+        targetCollection = nestMessagesRef;
     } else if (activeTab === 'dms' && dmRef && activeDmUser) {
-        targetRef = dmRef;
-        payload = { text: messageText, userId: user.uid, username: user.displayName, timestamp: serverTimestamp(), userIds: [user.uid, activeDmUser.userId] };
+        targetCollection = dmRef;
+        const now = serverTimestamp();
+        
+        // Create conversation pointer for sender
+        const senderConvRef = collection(db, `users/${user.uid}/conversations`).doc(activeDmUser.userId);
+        batch.set(senderConvRef, {
+            userId: activeDmUser.userId,
+            username: activeDmUser.username,
+            lastMessageAt: now,
+        });
+
+        // Create conversation pointer for receiver
+        const receiverConvRef = collection(db, `users/${activeDmUser.userId}/conversations`).doc(user.uid);
+        batch.set(receiverConvRef, {
+            userId: user.uid,
+            username: user.displayName,
+            lastMessageAt: now,
+        });
+
     } else {
         toast({ variant: 'destructive', title: 'Error', description: 'Invalid chat channel.' });
         setIsSending(false);
         return;
     }
+    
+    const messageRef = collection(db, targetCollection.path).doc();
+    batch.set(messageRef, messagePayload);
 
     try {
-      await addDoc(targetRef, payload);
+      await batch.commit();
       if (activeTab === 'global') {
           updateAchievementProgress('first-chat', 1);
           updateAchievementProgress('chat-contributor', 1);
