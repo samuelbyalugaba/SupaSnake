@@ -197,7 +197,7 @@ const FriendList = () => {
                                     <TableCell>
                                         <SnakePreview cosmetic={cosmetic} segments={3} cellSize={8} />
                                     </TableCell>
-                                    <TableCell className="text-right font-bold text-primary">{friend.leaguePoints.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right font-bold text-primary">{(friend.leaguePoints || 0).toLocaleString()}</TableCell>
                                 </TableRow>
                              )
                         })}

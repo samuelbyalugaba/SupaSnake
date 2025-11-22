@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useUser, useFirestore, useCollection } from '@/firebase';
 import { collection, doc, serverTimestamp, writeBatch, query, where, getDocs, limit, startAt, endAt, orderBy, setDoc, deleteDoc, runTransaction } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -18,13 +19,50 @@ export const useFriends = () => {
 
     // --- Data Fetching ---
     const friendsQuery = useMemo(() => user ? collection(db, `users/${user.uid}/friends`) : null, [user, db]);
-    const { data: friends, isLoading: isFriendsLoading } = useCollection<Friend>(friendsQuery);
+    const { data: friendLinks, isLoading: isFriendLinksLoading } = useCollection<Friend>(friendsQuery);
+
+    const [friends, setFriends] = useState<leaguePlayer[]>([]);
+    const [isFriendsLoading, setIsFriendsLoading] = useState(true);
+
+    useEffect(() => {
+        setIsFriendsLoading(true);
+        if (isFriendLinksLoading) return;
+        if (!friendLinks || friendLinks.length === 0) {
+            setFriends([]);
+            setIsFriendsLoading(false);
+            return;
+        }
+
+        const fetchFriendProfiles = async () => {
+            const friendIds = friendLinks.map(f => f.userId);
+            if (friendIds.length === 0) {
+                setFriends([]);
+                setIsFriendsLoading(false);
+                return;
+            }
+            const playersRef = collection(db, 'league-players');
+            const q = query(playersRef, where('userId', 'in', friendIds));
+            try {
+                const snapshot = await getDocs(q);
+                const friendProfiles = snapshot.docs.map(d => d.data() as leaguePlayer);
+                setFriends(friendProfiles);
+            } catch (error) {
+                console.error("Error fetching friend profiles:", error);
+                setFriends([]);
+            } finally {
+                setIsFriendsLoading(false);
+            }
+        };
+
+        fetchFriendProfiles();
+    }, [friendLinks, isFriendLinksLoading, db]);
 
     const friendRequestsQuery = useMemo(() => user ? query(collection(db, `users/${user.uid}/friend-requests`), where('status', '==', 'pending')) : null, [user, db]);
     const { data: friendRequests, isLoading: isRequestsLoading } = useCollection<FriendRequest>(friendRequestsQuery);
     
-    const sentRequestsQuery = useMemo(() => user ? query(collection(db, 'friend-requests-sent'), where('from', '==', user.uid)) : null, [user, db]);
-    const { data: sentRequests } = useCollection<any>(sentRequestsQuery);
+    // This can be improved by storing sent requests in a dedicated subcollection for the user
+    // For now, we'll rely on the UI state after sending a request
+    const [sentRequestCache, setSentRequestCache] = useState<string[]>([]);
 
 
     // --- Search ---
@@ -66,6 +104,7 @@ export const useFriends = () => {
                 status: 'pending',
                 createdAt: serverTimestamp(),
             });
+            setSentRequestCache(prev => [...prev, toPlayer.userId]);
             toast({ title: 'Friend request sent!' });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -126,15 +165,11 @@ export const useFriends = () => {
 
     // --- Friendship Status ---
     const friendshipStatus = useCallback((otherUserId: string): 'friends' | 'request_sent' | 'request_received' | 'not_friends' => {
-        if (friends?.some(f => f.id === otherUserId)) return 'friends';
+        if (friends?.some(f => f.userId === otherUserId)) return 'friends';
         if (friendRequests?.some(r => r.id === otherUserId)) return 'request_received';
-        // This is a bit tricky without querying the other user's doc, so we'll approximate client-side.
-        // A more robust solution would be a cloud function or a dedicated 'sent_requests' collection.
-        // For now, we rely on the button being disabled after sending.
-        // This logic will be improved if we build a full useFriends hook.
-        if (sentRequests?.some(r => r.to === otherUserId)) return 'request_sent';
+        if (sentRequestCache.includes(otherUserId)) return 'request_sent';
         return 'not_friends';
-    }, [friends, friendRequests, sentRequests]);
+    }, [friends, friendRequests, sentRequestCache]);
     
     
     return {
