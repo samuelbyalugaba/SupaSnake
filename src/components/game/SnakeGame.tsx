@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Maximize, Minimize, Pause, Play, ArrowLeft, Award, Gem, Gauge, ChevronUp } from 'lucide-react';
 import { GRID_SIZE, SCORE_INCREMENT } from '@/lib/constants';
-import type { Point, Difficulty, GameStatus } from '@/lib/types';
+import type { Point, Difficulty, GameStatus, Direction } from '@/lib/types';
 import { useSounds } from '@/hooks/use-sounds';
 import { cn } from '@/lib/utils';
 import { INITIAL_SNAKE_POSITION, INITIAL_DIRECTION } from '@/lib/constants';
@@ -40,6 +40,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
   const animationFrameId = useRef<number>(0);
   const lastUpdateTime = useRef(0);
   const lastFoodMoveTime = useRef(0);
+  const directionQueue = useRef<Direction[]>([]);
   
   const { user } = useUser();
   const { updateStatsAndAchievements } = useStats();
@@ -120,13 +121,13 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
   
   const createInitialState = useCallback(() => {
     const initialSnake = [...INITIAL_SNAKE_POSITION];
+    directionQueue.current = [];
     return {
       snake: initialSnake,
       food: generateFood(initialSnake),
       direction: INITIAL_DIRECTION,
       foodDirection: 'RIGHT' as const,
       speed: settings.speed,
-      nextDirection: INITIAL_DIRECTION,
     };
   }, [generateFood, settings.speed]);
 
@@ -321,7 +322,11 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
     if (gameOverTriggered.current) return;
     const state = gameLogicState.current;
     
-    state.direction = state.nextDirection;
+    const nextDirection = directionQueue.current.shift();
+    if (nextDirection) {
+      state.direction = nextDirection;
+    }
+    
     let head = { ...state.snake[0] };
 
     // Achievement checks that run every tick
@@ -562,26 +567,31 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
   }, [createInitialState]);
 
 
-  const handleDirectionChange = useCallback((newDirection: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT') => {
-    const state = gameLogicState.current;
+  const handleDirectionChange = useCallback((newDirection: Direction) => {
     if (displayState.status !== 'RUNNING') return;
-
+  
+    const lastDirectionInQueue = directionQueue.current.length > 0
+      ? directionQueue.current[directionQueue.current.length - 1]
+      : gameLogicState.current.direction;
+  
+    // Prevent adding the opposite direction to the queue
+    if (
+      (lastDirectionInQueue === 'UP' && newDirection === 'DOWN') ||
+      (lastDirectionInQueue === 'DOWN' && newDirection === 'UP') ||
+      (lastDirectionInQueue === 'LEFT' && newDirection === 'RIGHT') ||
+      (lastDirectionInQueue === 'RIGHT' && newDirection === 'LEFT')
+    ) {
+      return;
+    }
+  
+    // Track for achievements
     if (newDirection === 'LEFT') noLeftTurnRef.current = false;
     if (newDirection === 'RIGHT') noRightTurnRef.current = false;
     if (newDirection === 'UP') noUpTurnRef.current = false;
     if (newDirection === 'DOWN') noDownTurnRef.current = false;
-
-    const { direction } = state;
-    if (
-        (direction === 'UP' && newDirection === 'DOWN') ||
-        (direction === 'DOWN' && newDirection === 'UP') ||
-        (direction === 'LEFT' && newDirection === 'RIGHT') ||
-        (direction === 'RIGHT' && newDirection === 'LEFT')
-    ) {
-        return;
-    }
+  
     vibrate(20);
-    state.nextDirection = newDirection;
+    directionQueue.current.push(newDirection);
   }, [displayState.status]);
 
   const getCanvasSize = useCallback(() => {
@@ -769,5 +779,3 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ isFullScreen, toggleFullScreen, d
 };
 
 export default SnakeGame;
-
-    
