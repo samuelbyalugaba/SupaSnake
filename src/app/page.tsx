@@ -17,7 +17,7 @@ import { Progress } from '@/components/ui/progress';
 import { useCosmetics } from '@/context/CosmeticsContext';
 import { ALL_COSMETICS } from '@/lib/cosmetics';
 import type { Cosmetic } from '@/lib/types';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import SnakePreview from '@/components/game/SnakePreview';
 
 const HeroSection = () => (
@@ -165,23 +165,25 @@ const LoggedOutPrompt = () => (
 
 const ChatToggle = () => (
     <div className="fixed bottom-4 right-4 z-50">
-        <Sheet>
-            <SheetTrigger asChild>
+        <Dialog>
+            <DialogTrigger asChild>
                 <Button variant="outline" className="rounded-full h-12 w-12 p-0 flex items-center justify-center">
                     <MessageSquare />
                     <span className="sr-only">Open Global Chat</span>
                 </Button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="h-[400px] flex flex-col">
-                <SheetHeader>
-                    <SheetTitle>Chat</SheetTitle>
-                    <SheetDescription className="sr-only">
-                        Engage with the community in the global chat.
-                    </SheetDescription>
-                </SheetHeader>
-                <GlobalChat />
-            </SheetContent>
-        </Sheet>
+            </DialogTrigger>
+            <DialogContent className="h-full w-full max-w-full sm:h-[80vh] sm:max-w-4xl flex flex-col p-0">
+                <DialogHeader className="p-4 border-b">
+                    <DialogTitle>Community Chat</DialogTitle>
+                    <DialogDescription className="sr-only">
+                        Engage with the community in global, nest, or direct messages.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="flex-1 min-h-0">
+                  <GlobalChat />
+                </div>
+            </DialogContent>
+        </Dialog>
     </div>
 );
 
