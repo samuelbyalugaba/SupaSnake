@@ -19,6 +19,7 @@ import { useStats } from '@/hooks/use-stats';
 import { Avatar, AvatarFallback } from '../ui/avatar';
 import { useNests } from '@/hooks/use-nests';
 import Link from 'next/link';
+import PlayerProfileLink from './PlayerProfileLink';
 
 
 type ChatTab = 'global' | 'nest' | 'dms';
@@ -55,7 +56,7 @@ const ChatMessages = ({ messages, isLoading, currentUserId }: { messages: Messag
             {orderedMessages.map((message) => (
               <div key={message.id} className={`flex flex-col text-sm ${message.userId === currentUserId ? 'items-end' : 'items-start'}`}>
                 <div className={`flex items-baseline gap-2 ${message.userId === currentUserId ? 'flex-row-reverse' : ''}`}>
-                  <span className="font-bold truncate text-primary/80" style={{ maxWidth: '100px' }}>{message.username}</span>
+                    <PlayerProfileLink username={message.username} userId={message.userId} className="font-bold truncate text-primary/80" style={{ maxWidth: '100px' }} />
                    <span className="text-xs text-muted-foreground flex-shrink-0">
                      {message.timestamp?.toDate ? formatDistanceToNow(message.timestamp.toDate(), { addSuffix: true }) : ''}
                   </span>

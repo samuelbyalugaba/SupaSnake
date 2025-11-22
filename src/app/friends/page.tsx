@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -16,6 +17,12 @@ import { useFriends } from '@/context/FriendsContext';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import PlayerProfileLink from '@/components/game/PlayerProfileLink';
+import { ALL_COSMETICS } from '@/lib/cosmetics';
+import SnakePreview from '@/components/game/SnakePreview';
+import { cn } from '@/lib/utils';
+
 
 const searchFormSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters").max(20),
@@ -147,6 +154,7 @@ const FriendRequestList = () => {
 
 const FriendList = () => {
     const { friends, isFriendsLoading } = useFriends();
+    const { user } = useUser();
 
     if (isFriendsLoading) {
         return <div className="text-center p-8"><Loader2 className="animate-spin" /></div>
@@ -163,14 +171,41 @@ const FriendList = () => {
     }
     
     return (
-        <div className="space-y-4">
-            {friends.map(friend => (
-                <Card key={friend.userId} className="bg-card/50 border-primary/20">
-                   <PlayerCard player={friend} />
-                </Card>
-            ))}
-        </div>
-    )
+        <Card className="bg-card/50 border-primary/20">
+            <CardContent className="p-0">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Player</TableHead>
+                            <TableHead>Skin</TableHead>
+                            <TableHead className="text-right">League Points</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {friends.map((friend) => {
+                             const cosmetic = ALL_COSMETICS.find(c => c.id === friend.equippedCosmetic) || ALL_COSMETICS[0];
+                             return (
+                                <TableRow key={friend.userId} className={cn(friend.userId === user?.uid && "bg-primary/10")}>
+                                    <TableCell>
+                                        <div className="flex items-center gap-3">
+                                             <Avatar className="w-8 h-8 border-2 border-primary/50">
+                                                <AvatarFallback className="text-xs bg-muted">{friend.username?.charAt(0) ?? <UserPlus />}</AvatarFallback>
+                                            </Avatar>
+                                            <PlayerProfileLink username={friend.username} userId={friend.userId} />
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <SnakePreview cosmetic={cosmetic} segments={3} cellSize={8} />
+                                    </TableCell>
+                                    <TableCell className="text-right font-bold text-primary">{friend.leaguePoints.toLocaleString()}</TableCell>
+                                </TableRow>
+                             )
+                        })}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
 }
 
 

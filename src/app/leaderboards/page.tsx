@@ -16,6 +16,8 @@ import { User as UserIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ALL_COSMETICS } from '@/lib/cosmetics';
 import SnakePreview from '@/components/game/SnakePreview';
+import PlayerProfileLink from '@/components/game/PlayerProfileLink';
+
 
 const NestLeaderboard = () => {
     const { allNests, isLoading } = useNests();
@@ -128,13 +130,13 @@ const PlayerLeaderboard = () => {
                                              <Avatar className="w-8 h-8 border-2 border-primary/50">
                                                 <AvatarFallback className="text-xs bg-muted">{player.username?.charAt(0) ?? <UserIcon />}</AvatarFallback>
                                             </Avatar>
-                                            <span className="font-semibold">{player.username}</span>
+                                            <PlayerProfileLink username={player.username} userId={player.userId} />
                                         </div>
                                     </TableCell>
                                     <TableCell>
                                         <SnakePreview cosmetic={cosmetic} segments={3} cellSize={8} />
                                     </TableCell>
-                                    <TableCell className="text-right font-bold text-primary">{player.leaguePoints.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right font-bold text-primary">{(player.leaguePoints || 0).toLocaleString()}</TableCell>
                                 </TableRow>
                              )
                         })}
