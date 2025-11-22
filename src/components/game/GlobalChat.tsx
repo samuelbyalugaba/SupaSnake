@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { addDoc, collection, serverTimestamp, query, orderBy, limit, getDocs, Timestamp, writeBatch } from 'firebase/firestore';
-import { Send, MessageSquare, Users, Mail, ArrowLeft } from 'lucide-react';
+import { Send, MessageSquare, Users, Mail, ArrowLeft, Search } from 'lucide-react';
 import type { Message, leaguePlayer } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useStats } from '@/hooks/use-stats';
 import { Avatar, AvatarFallback } from '../ui/avatar';
 import { useNests } from '@/hooks/use-nests';
+import Link from 'next/link';
 
 
 type ChatTab = 'global' | 'nest' | 'dms';
@@ -108,7 +109,14 @@ const DMList = ({ onSelectUser, activeDmUser }: { onSelectUser: (user: leaguePla
     }
     
     if (conversations.length === 0) {
-        return <div className="text-center p-4 text-muted-foreground text-sm">No conversations yet. Find a player and send them a message!</div>;
+        return (
+            <div className="text-center p-4 text-muted-foreground text-sm flex flex-col items-center justify-center gap-4 h-full">
+                <p>No conversations yet. Find a player and send them a message!</p>
+                <Link href="/friends" passHref>
+                    <Button variant="outline"><Search className="mr-2"/> Find Players</Button>
+                </Link>
+            </div>
+        );
     }
 
     return (
@@ -180,20 +188,20 @@ const GlobalChat = ({ defaultTab = 'global', defaultDmUser }: { defaultTab?: Cha
         const now = serverTimestamp();
         
         // Create conversation pointer for sender
-        const senderConvRef = collection(db, `users/${user.uid}/conversations`).doc(activeDmUser.userId);
+        const senderConvRef = doc(db, `users/${user.uid}/conversations`, activeDmUser.userId);
         batch.set(senderConvRef, {
             userId: activeDmUser.userId,
             username: activeDmUser.username,
             lastMessageAt: now,
-        });
+        }, { merge: true });
 
         // Create conversation pointer for receiver
-        const receiverConvRef = collection(db, `users/${activeDmUser.userId}/conversations`).doc(user.uid);
+        const receiverConvRef = doc(db, `users/${activeDmUser.userId}/conversations`, user.uid);
         batch.set(receiverConvRef, {
             userId: user.uid,
             username: user.displayName,
             lastMessageAt: now,
-        });
+        }, { merge: true });
 
     } else {
         toast({ variant: 'destructive', title: 'Error', description: 'Invalid chat channel.' });
@@ -201,7 +209,7 @@ const GlobalChat = ({ defaultTab = 'global', defaultDmUser }: { defaultTab?: Cha
         return;
     }
     
-    const messageRef = collection(db, targetCollection.path).doc();
+    const messageRef = doc(collection(db, targetCollection.path));
     batch.set(messageRef, messagePayload);
 
     try {
@@ -277,5 +285,3 @@ const GlobalChat = ({ defaultTab = 'global', defaultDmUser }: { defaultTab?: Cha
 };
 
 export default GlobalChat;
-
-    
