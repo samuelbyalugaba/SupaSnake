@@ -198,9 +198,9 @@ const ChatToggle = () => (
             </SheetTrigger>
             <SheetContent side="bottom" className="h-[400px] flex flex-col">
                 <SheetHeader>
-                    <SheetTitle className="sr-only">Chat</SheetTitle>
+                    <SheetTitle>Chat</SheetTitle>
                     <SheetDescription className="sr-only">
-                        Switch between Global, Nest, and private messages.
+                        Engage with the community in the global chat.
                     </SheetDescription>
                 </SheetHeader>
                 <GlobalChat />
