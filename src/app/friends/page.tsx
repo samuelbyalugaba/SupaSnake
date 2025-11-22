@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -9,11 +8,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
-import { useFirestore, useUser } from '@/firebase';
-import { collection, query, where, getDocs, limit, startAt, endAt, orderBy } from 'firebase/firestore';
-import type { leaguePlayer } from '@/lib/types';
-import { Loader2, Users, Search, Frown } from 'lucide-react';
+import { useUser } from '@/firebase';
+import type { leaguePlayer, FriendRequest } from '@/lib/types';
+import { Loader2, Users, Search, Frown, Check, X, UserPlus, Send, Mail } from 'lucide-react';
 import PlayerCard from '@/components/game/PlayerCard';
+import { useFriends } from '@/context/FriendsContext';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 
 const searchFormSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters").max(20),
@@ -21,52 +23,28 @@ const searchFormSchema = z.object({
 
 type SearchFormValues = z.infer<typeof searchFormSchema>;
 
-export default function FriendsPage() {
+const SearchPlayers = () => {
     const { user } = useUser();
-    const db = useFirestore();
-    const [searchResults, setSearchResults] = useState<leaguePlayer[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
-    const [hasSearched, setHasSearched] = useState(false);
-
+    const { searchPlayers, searchResults, isSearching, hasSearched } = useFriends();
+    
     const form = useForm<SearchFormValues>({
         resolver: zodResolver(searchFormSchema),
         defaultValues: { username: "" },
     });
 
-    const handleSearch = async (data: SearchFormValues) => {
+    const handleSearch = (data: SearchFormValues) => {
         if (!user) return;
-        setIsSearching(true);
-        setHasSearched(true);
-        
-        const playersRef = collection(db, 'league-players');
-        const q = query(
-            playersRef,
-            orderBy('username'),
-            startAt(data.username),
-            endAt(data.username + '\uf8ff'),
-            limit(10)
-        );
-
-        try {
-            const querySnapshot = await getDocs(q);
-            const players = querySnapshot.docs
-                .map(doc => doc.data() as leaguePlayer)
-                .filter(p => p.userId !== user.uid); // Exclude self from results
-            setSearchResults(players);
-        } catch (error) {
-            console.error("Error searching for players:", error);
-            setSearchResults([]);
-        } finally {
-            setIsSearching(false);
-        }
+        searchPlayers(data.username);
     };
-    
+
+    const filteredResults = searchResults.filter(p => p.userId !== user?.uid);
+
     return (
-        <div className="container mx-auto p-4 md:p-8 space-y-8">
+        <div className="space-y-6">
             <Card className="bg-card/50 border-primary/20">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-3xl">
-                        <Users className="text-primary" />
+                    <CardTitle className="flex items-center gap-2 text-2xl">
+                        <Search className="text-primary" />
                         Find Players
                     </CardTitle>
                     <CardDescription>Search for other players to befriend and compete against.</CardDescription>
@@ -95,29 +73,146 @@ export default function FriendsPage() {
                 </CardContent>
             </Card>
 
-            <div>
+             <div>
                 {isSearching ? (
                     <div className="text-center p-8 flex items-center justify-center gap-2 text-muted-foreground">
                         <Loader2 className="animate-spin" /> Searching...
                     </div>
-                ) : hasSearched && searchResults.length === 0 ? (
+                ) : hasSearched && filteredResults.length === 0 ? (
                     <div className="text-center p-8 flex flex-col items-center justify-center gap-2 text-muted-foreground">
                         <Frown size={48} />
                         <p className="font-semibold">No players found.</p>
                         <p>Try a different username or check for typos.</p>
                     </div>
-                ) : searchResults.length > 0 ? (
+                ) : filteredResults.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {searchResults.map(player => (
+                        {filteredResults.map(player => (
                            <PlayerCard key={player.userId} player={player} />
                         ))}
                     </div>
-                ) : (
-                     <div className="text-center p-8 text-muted-foreground">
-                        <p>Search for players to get started.</p>
-                    </div>
-                )}
+                ) : null}
             </div>
+        </div>
+    )
+}
+
+const FriendRequestList = () => {
+    const { friendRequests, acceptFriendRequest, rejectFriendRequest, isResponding } = useFriends();
+
+    if (friendRequests.length === 0) {
+        return (
+            <div className="text-center p-8 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                <Mail size={48} />
+                <p className="font-semibold">No new friend requests.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            {friendRequests.map(req => (
+                <Card key={req.requestingUserId} className="bg-card/50 border-primary/20 flex items-center justify-between p-4">
+                    <div className="flex items-center gap-4">
+                        <Avatar className="w-10 h-10 border-2 border-primary/50">
+                            <AvatarFallback>{req.requestingUsername.charAt(0).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                            <p className="font-semibold">{req.requestingUsername}</p>
+                            <p className="text-sm text-muted-foreground">Wants to be your friend.</p>
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button 
+                            size="icon" 
+                            variant="outline" 
+                            onClick={() => acceptFriendRequest(req)} 
+                            disabled={isResponding}
+                        >
+                            <Check className="text-green-500" />
+                        </Button>
+                         <Button 
+                            size="icon" 
+                            variant="outline" 
+                            onClick={() => rejectFriendRequest(req.requestingUserId)}
+                            disabled={isResponding}
+                        >
+                            <X className="text-red-500" />
+                        </Button>
+                    </div>
+                </Card>
+            ))}
+        </div>
+    )
+}
+
+const FriendList = () => {
+    const { friends, isFriendsLoading } = useFriends();
+
+    if (isFriendsLoading) {
+        return <div className="text-center p-8"><Loader2 className="animate-spin" /></div>
+    }
+
+    if (friends.length === 0) {
+        return (
+             <div className="text-center p-8 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                <Frown size={48} />
+                <p className="font-semibold">Your friend list is empty.</p>
+                <p>Go find some players to add!</p>
+            </div>
+        );
+    }
+    
+    return (
+        <div className="space-y-4">
+            {friends.map(friend => (
+                <Card key={friend.userId} className="bg-card/50 border-primary/20">
+                   <PlayerCard player={friend} />
+                </Card>
+            ))}
+        </div>
+    )
+}
+
+
+export default function FriendsPage() {
+    const { user } = useUser();
+    const { friendRequests } = useFriends();
+
+    if (!user) {
+        return (
+            <div className="container mx-auto p-4 md:p-8">
+                <Card className="bg-card/50 border-primary/20 text-center p-8">
+                    <CardTitle>Login to Add Friends</CardTitle>
+                    <CardDescription className="mt-2">You need to be logged in to manage your friends.</CardDescription>
+                </Card>
+            </div>
+        )
+    }
+    
+    return (
+        <div className="container mx-auto p-4 md:p-8 space-y-8">
+            <h1 className="text-5xl font-black uppercase tracking-wider text-center" style={{ filter: `drop-shadow(0 0 10px hsl(var(--primary)))` }}>
+                Social Hub
+            </h1>
+            <Tabs defaultValue="search">
+                <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="search"><Search className="w-4 h-4 mr-2"/>Find</TabsTrigger>
+                    <TabsTrigger value="requests">
+                        <UserPlus className="w-4 h-4 mr-2"/>Requests 
+                        {friendRequests.length > 0 && <Badge className="ml-2">{friendRequests.length}</Badge>}
+                    </TabsTrigger>
+                    <TabsTrigger value="friends"><Users className="w-4 h-4 mr-2"/>Friends</TabsTrigger>
+                </TabsList>
+                <TabsContent value="search" className="mt-6">
+                    <SearchPlayers />
+                </TabsContent>
+                <TabsContent value="requests" className="mt-6">
+                    <FriendRequestList />
+                </TabsContent>
+                <TabsContent value="friends" className="mt-6">
+                    <FriendList />
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }

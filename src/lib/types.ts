@@ -137,4 +137,19 @@ export type Conversation = {
     userId: string;
     username: string;
     lastMessageAt: Timestamp;
-}
+};
+
+export type FriendRequest = {
+    id: string; // The doc ID is the requesting user's UID
+    requestingUserId: string;
+    requestingUsername: string;
+    status: 'pending';
+    createdAt: Timestamp;
+};
+
+export type Friend = {
+    id: string; // The doc ID is the friend's UID
+    userId: string;
+    username: string;
+    since: Timestamp;
+};

@@ -10,6 +10,7 @@ import { SettingsProvider } from '@/context/SettingsContext';
 import AppWithSettings from '@/components/AppWithSettings';
 import { AchievementProvider } from '@/context/AchievementContext';
 import { CosmeticsProvider } from '@/context/CosmeticsContext';
+import { FriendsProvider } from '@/context/FriendsContext';
 
 export const metadata: Metadata = {
   title: 'Supa Snake',
@@ -55,14 +56,16 @@ export default function RootLayout({
             <SettingsProvider>
                 <AchievementProvider>
                   <CosmeticsProvider>
-                    <AppWithSettings>
-                      <Header />
-                      <main className="flex-1 flex flex-col">
-                        {children}
-                      </main>
-                      <Toaster />
-                      <Footer />
-                    </AppWithSettings>
+                    <FriendsProvider>
+                      <AppWithSettings>
+                        <Header />
+                        <main className="flex-1 flex flex-col">
+                          {children}
+                        </main>
+                        <Toaster />
+                        <Footer />
+                      </AppWithSettings>
+                    </FriendsProvider>
                   </CosmeticsProvider>
                 </AchievementProvider>
             </SettingsProvider>

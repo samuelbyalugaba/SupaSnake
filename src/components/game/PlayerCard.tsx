@@ -1,11 +1,10 @@
-
 "use client";
 
 import React, { useMemo, useState } from 'react';
 import type { leaguePlayer } from '@/lib/types';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { User as UserIcon, Crown, Shield, Swords, PlusCircle, MessageSquare } from 'lucide-react';
+import { User as UserIcon, Crown, Shield, Swords, PlusCircle, MessageSquare, CheckCircle, Send, UserCheck } from 'lucide-react';
 import SnakePreview from './SnakePreview';
 import { ALL_COSMETICS } from '@/lib/cosmetics';
 import { Button } from '../ui/button';
@@ -15,6 +14,7 @@ import { Skeleton } from '../ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import GlobalChat from './GlobalChat';
 import { useUser } from '@/firebase';
+import { useFriends } from '@/context/FriendsContext';
 
 const rankTiers = [
   { name: 'Serpent King', icon: Crown, color: 'text-yellow-400', minPoints: 10000 },
@@ -29,6 +29,7 @@ const getRankForPoints = (points: number) => {
 const PlayerCard = ({ player }: { player: leaguePlayer }) => {
     const { user } = useUser();
     const { allNests, isLoading: isNestsLoading } = useNests();
+    const { sendFriendRequest, friendshipStatus, isResponding } = useFriends();
     const [isChatOpen, setIsChatOpen] = useState(false);
     
     const cosmetic = useMemo(() => {
@@ -47,6 +48,27 @@ const PlayerCard = ({ player }: { player: leaguePlayer }) => {
             setIsChatOpen(true);
         }
     }
+    
+    const status = friendshipStatus(player.userId);
+
+    const renderFriendButton = () => {
+        switch (status) {
+            case 'friends':
+                return <Button variant="outline" className="w-full" disabled><UserCheck /> Friends</Button>;
+            case 'request_sent':
+                return <Button variant="outline" className="w-full" disabled><Send /> Request Sent</Button>;
+            case 'request_received':
+                 return <Button variant="outline" className="w-full" onClick={() => { /* This should be handled in the requests tab */ }}>Respond to Request</Button>;
+            case 'not_friends':
+            default:
+                return (
+                    <Button variant="outline" className="w-full" onClick={() => sendFriendRequest(player)} disabled={isResponding}>
+                        <PlusCircle /> Add Friend
+                    </Button>
+                );
+        }
+    };
+
 
     return (
         <>
@@ -84,11 +106,9 @@ const PlayerCard = ({ player }: { player: leaguePlayer }) => {
                 </div>
             </CardContent>
             <CardFooter className="grid grid-cols-2 gap-2">
-                <Button variant="outline" className="w-full">
-                    <PlusCircle className="mr-2" /> Add Friend
-                </Button>
+                {renderFriendButton()}
                 <Button variant="outline" className="w-full" onClick={handleMessageClick} disabled={!user || user.uid === player.userId}>
-                    <MessageSquare className="mr-2" /> Message
+                    <MessageSquare /> Message
                 </Button>
             </CardFooter>
         </Card>

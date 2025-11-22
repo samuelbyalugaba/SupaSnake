@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "achievement": {
@@ -132,6 +131,29 @@
         "nestId": { "type": "string", "description": "The ID of the Nest that owns this name." }
       },
       "required": ["nestId"]
+    },
+    "friendRequest": {
+      "title": "Friend Request",
+      "description": "Represents one user's request to befriend another.",
+      "type": "object",
+      "properties": {
+        "requestingUserId": { "type": "string", "description": "The UID of the user sending the request." },
+        "requestingUsername": { "type": "string", "description": "The username of the user sending the request." },
+        "status": { "type": "string", "enum": ["pending"], "description": "The status of the request." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the request was sent." }
+      },
+      "required": ["requestingUserId", "requestingUsername", "status", "createdAt"]
+    },
+    "friend": {
+      "title": "Friend",
+      "description": "Represents a friendship link between two users.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The UID of the friend." },
+        "username": { "type": "string", "description": "The username of the friend." },
+        "since": { "type": "string", "format": "date-time", "description": "Timestamp of when the friendship started." }
+      },
+      "required": ["userId", "username", "since"]
     }
   },
   "auth": {
@@ -153,6 +175,14 @@
      "/users/{userId}/conversations/{otherUserId}": {
       "schema": { "$ref": "#/entities/conversation" },
       "description": "A list of users that the parent user has DM conversations with."
+    },
+    "/users/{userId}/friend-requests/{requestingUserId}": {
+      "schema": { "$ref": "#/entities/friendRequest" },
+      "description": "Incoming friend requests for a user."
+    },
+    "/users/{userId}/friends/{friendId}": {
+      "schema": { "$ref": "#/entities/friend" },
+      "description": "A user's list of friends."
     },
     "/usernames/{username}": {
       "schema": { "$ref": "#/entities/username" },
@@ -192,4 +222,3 @@
     }
   }
 }
-    
