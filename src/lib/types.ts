@@ -56,6 +56,7 @@ export type UserStats = {
     equippedCosmetic: string;
     nestId: string | null;
     leaguePoints: number;
+    lastSeasonClaimed?: string; // e.g., "2024-10"
 };
 
 export type leaguePlayer = {

@@ -3,7 +3,7 @@
 
 import { useMemo, useCallback } from 'react';
 import { useUser, useFirestore, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { doc, writeBatch, increment, setDoc } from 'firebase/firestore';
+import { doc, writeBatch, increment, setDoc, updateDoc } from 'firebase/firestore';
 import type { UserStats } from '@/lib/types';
 import { useAchievements } from '@/context/AchievementContext';
 
@@ -17,7 +17,7 @@ export const useStats = () => {
         [user, db]
     );
 
-    const { data: stats, isLoading } = useDoc<UserStats>(statsRef);
+    const { data: stats, isLoading, refetch: refetchStats } = useDoc<UserStats>(statsRef);
     
     const updateStatsAndAchievements = useCallback(async ({ score, foodEaten, achievementsToSync }: { score: number; foodEaten: number; achievementsToSync: Map<string, { value: number; type: 'max' | 'cumulative' }>}) => {
         if (!user || !db) return;
@@ -60,7 +60,7 @@ export const useStats = () => {
         batch.commit()
             .then(() => {
                 clearAchievementsToSync();
-                refetchAchievements();
+                // Don't need to refetch; useDoc listeners will handle it
             })
             .catch((error) => {
                 const permissionError = new FirestorePermissionError({
@@ -75,9 +75,20 @@ export const useStats = () => {
                 errorEmitter.emit('permission-error', permissionError);
             });
 
-    }, [statsRef, user, db, syncAchievements, clearAchievementsToSync, refetchAchievements, stats]);
+    }, [statsRef, user, db, syncAchievements, clearAchievementsToSync, stats]);
 
-    return { stats, isLoading, updateStatsAndAchievements };
+    const updateSeasonClaim = useCallback(async (seasonId: string, reward: number) => {
+        if (!statsRef) return;
+        
+        const payload = {
+            lastSeasonClaimed: seasonId,
+            neonBits: increment(reward),
+        };
+
+        await updateDoc(statsRef, payload);
+        // The useDoc hook will automatically update the stats state
+        
+    }, [statsRef]);
+
+    return { stats, isLoading, updateStatsAndAchievements, updateSeasonClaim };
 };
-
-    
